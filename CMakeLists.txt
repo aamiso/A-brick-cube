@@ -37,9 +37,9 @@ target_link_libraries(${PROJECT_NAME}
   SceAppUtil_stub
   SceCommonDialog_stub
   SceKernelDmacMgr_stub
+  stdc++
   m
 )
-
 # Crea el .vpk (el archivo que se instala en la Vita o se abre en el emulador)
 vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME})
 vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
