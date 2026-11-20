@@ -231,7 +231,7 @@ int main(void) {
         vglSwapBuffers(GL_FALSE);
     }
 
-    vglEnd();
+
     sceKernelExitProcess(0);
     return 0;
 }
