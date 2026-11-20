@@ -1,0 +1,40 @@
+name: Compilar LEGO GTA
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: vitasdk/vitasdk:latest
+
+    steps:
+      - name: Descargar el proyecto
+        uses: actions/checkout@v4
+
+      - name: Instalar mathneon
+        run: |
+          git clone --depth 1 https://github.com/Rinnegatamante/math-neon
+          make -C math-neon install
+
+      - name: Instalar vitaShaRK
+        run: |
+          git clone --depth 1 https://github.com/Rinnegatamante/vitaShaRK
+          make -C vitaShaRK install
+
+      - name: Instalar vitaGL (el 3D)
+        run: |
+          git clone --depth 1 https://github.com/Rinnegatamante/vitaGL
+          make -C vitaGL HAVE_SHARK=1 NO_DEBUG=1 install
+
+      - name: Compilar el juego
+        run: |
+          cmake -S . -B build
+          cmake --build build
+
+      - name: Guardar el .vpk para descargarlo
+        uses: actions/upload-artifact@v4
+        with:
+          name: legogta-vpk
+          path: build/*.vpk
