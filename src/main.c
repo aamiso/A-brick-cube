@@ -63,7 +63,9 @@ static void caja(float x, float y, float z, float sx, float sy, float sz,
 static void baldosa(float x, float y, float z, float sx, float sz,
                     float r, float g, float b) {
     glPushMatrix();
-    glTranslatef(x, y, z);
+    // La tapa del cubo está 0.5 arriba de su centro; se baja 0.5 para que
+    // la superficie del suelo quede justo a la altura "y" (los pies del personaje)
+    glTranslatef(x, y - 0.5f, z);
     glScalef(sx, 1.0f, sz);
     glColor3f(r, g, b);
     glDrawArrays(GL_TRIANGLES, CARA_ARRIBA * 6, 6);
@@ -230,7 +232,6 @@ int main(void) {
 
         vglSwapBuffers(GL_FALSE);
     }
-
 
     sceKernelExitProcess(0);
     return 0;
