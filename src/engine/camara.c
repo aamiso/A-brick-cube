@@ -1,13 +1,13 @@
 #include "engine/camara.h"
 #include <vitaGL.h>
 
-// Límites de la inclinación: no dejar que baje al suelo ni quede totalmente arriba
-#define ALTO_MIN 20.0f
-#define ALTO_MAX 75.0f
+// Límites de la inclinación (los mismos de la versión original)
+#define ALTO_MIN 5.0f
+#define ALTO_MAX 70.0f
 
 void camara_iniciar(Camara *c) {
     c->giro = 0.0f;
-    c->alto = 55.0f;    // semi cenital (antes era 25)
+    c->alto = 25.0f;    // la inclinación original que te gustaba
     c->distancia = 9.0f;
 }
 
