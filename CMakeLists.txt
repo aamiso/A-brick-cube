@@ -15,11 +15,18 @@ include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 # Nombre y datos del juego en la Vita
 set(VITA_APP_NAME "LEGO GTA")
 set(VITA_TITLEID  "LEGOGTA01")
-set(VITA_VERSION  "00.10")
+set(VITA_VERSION  "00.20")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-q -O2 -std=gnu99")
 
-add_executable(${PROJECT_NAME} src/main.c)
+# Busca solo todos los archivos .c dentro de src/ (y sus subcarpetas).
+# Así, cuando agreguemos archivos nuevos, no hay que tocar este archivo.
+file(GLOB_RECURSE JUEGO_SRC ${CMAKE_SOURCE_DIR}/src/*.c)
+
+add_executable(${PROJECT_NAME} ${JUEGO_SRC})
+
+# Permite escribir #include "engine/cubo.h" desde cualquier archivo
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # Librerías que necesita vitaGL para dibujar en 3D
 target_link_libraries(${PROJECT_NAME}
