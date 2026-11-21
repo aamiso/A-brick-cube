@@ -1,4 +1,4 @@
-name: Compilar LEGO GTA
+name: compilar A Brick Cube
 
 on:
   push:
@@ -36,5 +36,5 @@ jobs:
       - name: Guardar el .vpk para descargarlo
         uses: actions/upload-artifact@v4
         with:
-          name: legogta-vpk
+          name: a-brick-cube-vpk
           path: build/*.vpk
