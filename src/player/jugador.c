@@ -6,7 +6,7 @@
 #include <vitaGL.h>
 #include <math.h>
 
-#define RADIO 0.5f // qué tan "ancho" es el personaje para chocar con las cosas
+#define RADIO 0.4f // qué tan "ancho" es el personaje para chocar (mide 1 x 1 en el mapa)
 
 void jugador_iniciar(Jugador *j) {
     j->x = 0.0f;

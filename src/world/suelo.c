@@ -2,25 +2,35 @@
 #include "world/ciudad.h"
 #include "engine/cubo.h"
 
-// El pasto cubre justo el mismo tamaño que el mapa de la ciudad
-#define MITAD (CIUDAD_LADO / 2)
-#define TAM   CIUDAD_TAM
+// Cuadros de pasto: se dibujan de 4 x 4, o de 8 x 8 si el mapa es muy grande,
+// para no dibujar miles de baldosas.
+static float tam_cuadro(void) {
+    return (ciudad_ancho() * ciudad_alto() <= 96 * 96) ? 4.0f : 8.0f;
+}
 
 void suelo_dibujar(void) {
-    for (int i = -MITAD; i < MITAD; i++) {
-        for (int j = -MITAD; j < MITAD; j++) {
-            int par = ((i + j) & 1) == 0;
-            float g = par ? 0.65f : 0.50f;
-            baldosa((i + 0.5f) * TAM, 0.0f, (j + 0.5f) * TAM, TAM, TAM,
-                    0.20f, g, 0.20f);
+    float W = ciudad_ancho() * CIUDAD_TAM;
+    float H = ciudad_alto()  * CIUDAD_TAM;
+    float S = tam_cuadro();
+
+    int i = 0;
+    for (float x = 0.0f; x < W; x += S, i++) {
+        float ancho = (x + S > W) ? (W - x) : S;   // el último cuadro puede ser más angosto
+        int j = 0;
+        for (float z = 0.0f; z < H; z += S, j++) {
+            float largo = (z + S > H) ? (H - z) : S;
+            float g = (((i + j) & 1) == 0) ? 0.65f : 0.50f;
+            baldosa(x + ancho * 0.5f - W * 0.5f, 0.0f, z + largo * 0.5f - H * 0.5f,
+                    ancho, largo, 0.20f, g, 0.20f);
         }
     }
 }
 
 void suelo_limitar(float *x, float *z) {
-    float limite = MITAD * TAM - 0.5f;
-    if (*x >  limite) *x =  limite;
-    if (*x < -limite) *x = -limite;
-    if (*z >  limite) *z =  limite;
-    if (*z < -limite) *z = -limite;
+    float lim_x = ciudad_ancho() * CIUDAD_TAM * 0.5f - 0.5f;
+    float lim_z = ciudad_alto()  * CIUDAD_TAM * 0.5f - 0.5f;
+    if (*x >  lim_x) *x =  lim_x;
+    if (*x < -lim_x) *x = -lim_x;
+    if (*z >  lim_z) *z =  lim_z;
+    if (*z < -lim_z) *z = -lim_z;
 }

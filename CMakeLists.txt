@@ -15,7 +15,7 @@ include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 # Nombre y datos del juego en la Vita
 set(VITA_APP_NAME "A Brick Cube")
 set(VITA_TITLEID  "ABCV00001")
-set(VITA_VERSION  "00.21")
+set(VITA_VERSION  "00.30")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-q -O2 -std=gnu99")
 
@@ -49,7 +49,15 @@ target_link_libraries(${PROJECT_NAME}
 )
 # Crea el .vpk (el archivo que se instala en la Vita o se abre en el emulador)
 vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME})
+
+# Archivos que se meten dentro del .vpk (el mapa de la ciudad)
+set(VPK_ARCHIVOS "")
+if(EXISTS ${CMAKE_SOURCE_DIR}/data/mapas/ciudad.txt)
+  list(APPEND VPK_ARCHIVOS FILE ${CMAKE_SOURCE_DIR}/data/mapas/ciudad.txt data/mapas/ciudad.txt)
+endif()
+
 vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
   VERSION ${VITA_VERSION}
   NAME ${VITA_APP_NAME}
+  ${VPK_ARCHIVOS}
 )

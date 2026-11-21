@@ -1,4 +1,4 @@
-// A Brick Cube Vita - Fase 2: una mini ciudad por la que se puede caminar
+// A Brick Cube Vita - Fase 3: ciudad cargada desde un mapa de texto (data/mapas/ciudad.txt)
 //
 // Controles:
 //   Stick izquierdo = caminar
@@ -21,9 +21,13 @@ int main(void) {
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
     cubo_construir();
 
+    // Lee el mapa (si no lo encuentra, usa uno chiquito incluido en el juego)
+    ciudad_cargar("app0:data/mapas/ciudad.txt");
+
     Jugador jugador;
     Camara camara;
     jugador_iniciar(&jugador);
+    ciudad_inicio(&jugador.x, &jugador.z); // empieza donde dice la P del mapa
     camara_iniciar(&camara);
 
     while (1) {
