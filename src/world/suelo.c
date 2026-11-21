@@ -1,8 +1,10 @@
 #include "world/suelo.h"
+#include "world/ciudad.h"
 #include "engine/cubo.h"
 
-#define MITAD 10   // 10 baldosas hacia cada lado = 20x20 en total
-#define TAM   3.0f // tamaño de cada baldosa
+// El pasto cubre justo el mismo tamaño que el mapa de la ciudad
+#define MITAD (CIUDAD_LADO / 2)
+#define TAM   CIUDAD_TAM
 
 void suelo_dibujar(void) {
     for (int i = -MITAD; i < MITAD; i++) {

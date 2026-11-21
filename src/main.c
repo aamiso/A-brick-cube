@@ -1,4 +1,4 @@
-// A Brick Cube Vita - Fase 1: el mismo juego de antes, pero separado en módulos
+// A Brick Cube Vita - Fase 2: una mini ciudad por la que se puede caminar
 //
 // Controles:
 //   Stick izquierdo = caminar
@@ -14,6 +14,7 @@
 #include "engine/camara.h"
 #include "player/jugador.h"
 #include "world/suelo.h"
+#include "world/ciudad.h"
 
 int main(void) {
     vglInit(0x800000);
@@ -48,6 +49,7 @@ int main(void) {
 
         cubo_activar();
         suelo_dibujar();
+        ciudad_dibujar();
         jugador_dibujar(&jugador);
         cubo_desactivar();
 

@@ -1,9 +1,12 @@
 #include "player/jugador.h"
 #include "engine/cubo.h"
 #include "world/suelo.h"
+#include "world/ciudad.h"
 #include "core/util.h"
 #include <vitaGL.h>
 #include <math.h>
+
+#define RADIO 0.5f // qué tan "ancho" es el personaje para chocar con las cosas
 
 void jugador_iniciar(Jugador *j) {
     j->x = 0.0f;
@@ -24,8 +27,11 @@ void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara) {
 
     if (fuerza > 0.01f) {
         if (fuerza > 1.0f) { dx /= fuerza; dz /= fuerza; fuerza = 1.0f; }
-        j->x += dx * 0.15f;
-        j->z += dz * 0.15f;
+        // Se mueve en X y en Z por separado: si choca con una pared de frente,
+        // todavía puede deslizarse a lo largo de ella.
+        float paso_x = dx * 0.15f, paso_z = dz * 0.15f;
+        if (!ciudad_choca(j->x + paso_x, j->z, RADIO)) j->x += paso_x;
+        if (!ciudad_choca(j->x, j->z + paso_z, RADIO)) j->z += paso_z;
         j->angulo = atan2f(dx, dz) * 180.0f / PI;
         j->paso += 0.25f * fuerza;
     } else {
