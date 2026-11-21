@@ -1,4 +1,4 @@
-// A Brick Cube Vita - Fase 3: ciudad cargada desde un mapa de texto (data/mapas/ciudad.txt)
+// A Brick Cube Vita - Fase 4: ciudad grande con frontera, cargada desde un mapa de texto (data/mapas/ciudad.txt)
 //
 // Controles:
 //   Stick izquierdo = caminar
@@ -15,6 +15,7 @@
 #include "player/jugador.h"
 #include "world/suelo.h"
 #include "world/ciudad.h"
+#include "world/frontera.h"
 
 int main(void) {
     vglInit(0x800000);
@@ -43,17 +44,24 @@ int main(void) {
         glViewport(0, 0, 960, 544);
         glClearColor(0.5f, 0.75f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        glFrustum(-0.96f, 0.96f, -0.544f, 0.544f, 1.0f, 200.0f);
+        glFrustum(-0.96f, 0.96f, -0.544f, 0.544f, 1.0f, 330.0f);
 
         camara_aplicar(&camara, jugador.x, jugador.z);
 
         cubo_activar();
-        suelo_dibujar();
-        ciudad_dibujar();
+        // 1) Todo lo plano (mar, arena, pasto, calles) se pinta en orden y sin profundidad:
+        //    así nunca se mezclan ni se ven rayitas entre ellos.
+        glDisable(GL_DEPTH_TEST);
+        frontera_dibujar_suelo(jugador.x, jugador.z);
+        suelo_dibujar(jugador.x, jugador.z);
+        ciudad_dibujar_suelo(jugador.x, jugador.z);
+        // 2) Lo que tiene volumen, con profundidad.
+        glEnable(GL_DEPTH_TEST);
+        ciudad_dibujar(jugador.x, jugador.z);
+        frontera_dibujar(jugador.x, jugador.z);
         jugador_dibujar(&jugador);
         cubo_desactivar();
 

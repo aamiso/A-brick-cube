@@ -45,7 +45,7 @@ void caja(float x, float y, float z, float sx, float sy, float sz,
     glPushMatrix();
     glTranslatef(x, y, z);
     glScalef(sx, sy, sz);
-    for (int c = 0; c < 6; c++) {
+    for (int c = 0; c < 5; c++) { // la cara de abajo nunca se ve, no se dibuja
         glColor3f(r * brillo[c], g * brillo[c], b * brillo[c]);
         glDrawArrays(GL_TRIANGLES, c * 6, 6);
     }
