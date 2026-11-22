@@ -1,4 +1,4 @@
-// La ciudad: calles, aceras, casas, edificios y árboles hechos de cubos.
+// La ciudad: calles, aceras, edificios con ventanas, árboles y lugares con modelo voxel.
 // El mapa se lee de un archivo de texto: cada letra es una celda de 1 x 1,
 // igual de grande que el personaje.
 #ifndef WORLD_CIUDAD_H
@@ -23,6 +23,12 @@ void ciudad_dibujar(float px, float pz);
 
 // 1 si un círculo en (x, z) con ese radio toca un edificio, árbol o agua.
 int ciudad_choca(float x, float z, float radio);
+
+// Qué letra hay en la celda (col, fila). Fuera del mapa devuelve '.'.
+char ciudad_tipo_en(int col, int fila);
+// Centro de una celda en el mundo
+float ciudad_centro_x(int col);
+float ciudad_centro_z(int fila);
 
 // Altura de lo que hay en ese punto (0 si es suelo libre). La usa la cámara.
 float ciudad_altura_en(float x, float z);

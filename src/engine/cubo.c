@@ -12,7 +12,7 @@ static const int caras[6][4] = {
     {5, 1, 2, 6}, {3, 7, 6, 2}, {0, 1, 5, 4}};
 
 // Qué tan clara se ve cada cara (así se nota el volumen sin luces)
-static const float brillo[6] = {0.80f, 0.60f, 0.70f, 0.70f, 1.00f, 0.40f};
+static const float brillo[6] = {0.90f, 0.68f, 0.84f, 0.78f, 1.00f, 0.40f};
 
 #define CARA_ARRIBA 4
 

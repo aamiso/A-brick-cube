@@ -1,0 +1,9 @@
+A Brick Cube - Fase 5
+
+src/                código del juego
+data/mapas/         ciudad.txt (el mapa, 300 x 300)
+data/modelos/       casa_roja, casa_azul, casa_moderna, banco, cafe (modelos voxel en texto)
+tools/              generar_mapa.py (genera un mapa de ejemplo)
+
+Para cambiar un modelo: abre el Visor Voxel, edita, copia el texto y reemplaza el archivo en data/modelos/ (mismo nombre).
+Para cambiar el mapa: reemplaza data/mapas/ciudad.txt.

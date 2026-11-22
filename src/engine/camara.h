@@ -7,13 +7,14 @@ typedef struct {
     float alto;      // inclinación (grados): 0 = de lado, 90 = desde arriba
     float distancia; // qué tan lejos QUIERE estar del jugador
     float real;      // qué tan lejos está de verdad (se acerca si hay un edificio atrás)
+    float alto_real; // inclinación real (sube sola si un edificio tapa la vista)
 } Camara;
 
 void camara_iniciar(Camara *c);
 void camara_actualizar(Camara *c, float rx, float ry);
 
 // Pone la cámara mirando al jugador (px, pz). Si un edificio se interpone,
-// la cámara se acerca para no meterse dentro de la pared.
+// la cámara sube un poco (y si no alcanza, se acerca) para no meterse dentro de la pared.
 void camara_aplicar(Camara *c, float px, float pz);
 
 #endif

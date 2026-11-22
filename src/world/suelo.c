@@ -20,8 +20,8 @@ void suelo_dibujar(float px, float pz) {
             float largo = (z + CUADRO > H) ? (H - z) : CUADRO;
             float cz = z + largo * 0.5f - H * 0.5f;
             if (fabsf(cz - pz) > VISTA) continue;
-            float g = (((i + j) & 1) == 0) ? 0.65f : 0.50f;
-            baldosa(cx, 0.0f, cz, ancho, largo, 0.20f, g, 0.20f);
+            int par = ((i + j) & 1) == 0;
+            baldosa(cx, 0.0f, cz, ancho, largo, par ? 0.42f : 0.38f, par ? 0.76f : 0.71f, par ? 0.30f : 0.27f);
         }
     }
 }

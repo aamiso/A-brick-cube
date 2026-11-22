@@ -1,4 +1,4 @@
-// A Brick Cube Vita - Fase 4: ciudad grande con frontera, cargada desde un mapa de texto (data/mapas/ciudad.txt)
+// A Brick Cube Vita - Fase 5: ciudad voxel con casas, banco y café (modelos), calles con detalle y personaje animado (data/mapas/ciudad.txt)
 //
 // Controles:
 //   Stick izquierdo = caminar
@@ -16,9 +16,10 @@
 #include "world/suelo.h"
 #include "world/ciudad.h"
 #include "world/frontera.h"
+#include "world/terreno.h"
 
 int main(void) {
-    vglInit(0x800000);
+    vglInit(0x1000000);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
     cubo_construir();
 
@@ -58,9 +59,10 @@ int main(void) {
         frontera_dibujar_suelo(jugador.x, jugador.z);
         suelo_dibujar(jugador.x, jugador.z);
         ciudad_dibujar_suelo(jugador.x, jugador.z);
+        terreno_dibujar(jugador.x, jugador.z, camara.giro);   // detalle de cerca: rayas, bordillos, cebras
         // 2) Lo que tiene volumen, con profundidad.
         glEnable(GL_DEPTH_TEST);
-        ciudad_dibujar(jugador.x, jugador.z);
+        ciudad_dibujar(jugador.x, jugador.z);   // edificios, árboles y lugares con modelo
         frontera_dibujar(jugador.x, jugador.z);
         jugador_dibujar(&jugador);
         cubo_desactivar();

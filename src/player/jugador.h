@@ -1,11 +1,13 @@
-// El personajito LEGO: su posición, su movimiento y cómo se dibuja
+// El jugador: su posición, su movimiento y su animación
 #ifndef PLAYER_JUGADOR_H
 #define PLAYER_JUGADOR_H
 
 typedef struct {
     float x, z;     // posición en el suelo
     float angulo;   // hacia dónde mira (grados)
-    float paso;     // animación de caminar
+    float vel;      // 0 parado ... 1 a toda velocidad (suavizado)
+    float fase;     // avanza al caminar (mueve piernas y brazos)
+    float tiempo;   // segundos desde que empezó (respiración, mirar alrededor)
 } Jugador;
 
 void jugador_iniciar(Jugador *j);
