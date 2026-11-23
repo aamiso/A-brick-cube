@@ -1,0 +1,16 @@
+A Brick Cube - Fase 5
+
+src/                código del juego
+data/mapas/         ciudad.txt (el mapa, 300 x 300)
+data/modelos/       casa_roja, casa_azul, casa_moderna, banco, cafe (modelos voxel en texto)
+tools/              generar_mapa.py (genera un mapa de ejemplo)
+
+Para cambiar un modelo: abre el Visor Voxel, edita, copia el texto y reemplaza el archivo en data/modelos/ (mismo nombre).
+Para cambiar el mapa: reemplaza data/mapas/ciudad.txt.
+
+--- Version 00.51: optimizacion ---
+Antes: ~1.200 llamadas de dibujo por cuadro y 4 MB de datos copiados cada cuadro (11 FPS en Vita3K).
+Ahora: ~80 llamadas por cuadro y los datos viven en la memoria de video (VBO).
+
+--- 00.52 ---
+Edificios de cubitos (voxels), camara que solo se acerca (sin subir) y mas suave.
