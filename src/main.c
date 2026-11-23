@@ -123,12 +123,13 @@ int main(void) {
         glLoadIdentity();
         glFrustum(-0.576f, 0.576f, -0.3264f, 0.3264f, 0.6f, 330.0f);
 
+        camara.py += ((en_carro < 0 ? jugador.suelo : 0.0f) - camara.py) * 0.15f;
         camara_aplicar(&camara, fx, fz);
 
         cubo_activar();
         // 1) Todo lo plano (mar, arena, pasto, calles) se pinta en orden y sin profundidad:
         //    así nunca se mezclan ni se ven rayitas entre ellos.
-        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_DEPTH_TEST);
         frontera_dibujar_suelo(fx, fz);
         suelo_dibujar(fx, fz);
         ciudad_dibujar_suelo(fx, fz);

@@ -27,6 +27,12 @@ void ciudad_precalentar(float px, float pz);
 // 1 si un círculo en (x, z) con ese radio toca un edificio, árbol o agua.
 int ciudad_choca(float x, float z, float radio);
 
+// Igual, pero estando a la altura "y": lo bajito (hasta y + un escalón) no estorba, se sube.
+int ciudad_choca_y(float x, float z, float radio, float y);
+
+// Altura del suelo donde se para (0 = calle; más si hay algo sólido a su alcance para subirse)
+float ciudad_piso(float x, float z, float radio, float y);
+
 // Qué letra hay en la celda (col, fila). Fuera del mapa devuelve '.'.
 char ciudad_tipo_en(int col, int fila);
 // Centro de una celda en el mundo

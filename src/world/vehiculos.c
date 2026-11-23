@@ -17,7 +17,7 @@ static int n_carros = 0;
 static const unsigned int COLORES[] = { 0xd9382c, 0x2f62c9, 0xf2c230, 0x3aa655, 0xf2f2f2, 0x8a3fc0, 0xe8742a, 0x303338 };
 
 // Un carro de 8 x 16 x 7 cubitos (1.6 de ancho, 3.2 de largo). El frente mira a +z.
-static void armar_carro(Malla *m, unsigned int color) {
+static void armar_carro(Malla *m, unsigned int color, int tipo) {
     Voxeles v;
     voxel_crear(&v, 8, 16, 7);
     voxel_color(&v, 'c', color);
@@ -27,11 +27,23 @@ static void armar_carro(Malla *m, unsigned int color) {
     voxel_color(&v, 'r', 0xe02020);
     voxel_color(&v, 'm', 0x9aa0a8);
     voxel_color(&v, 'd', ((color >> 1) & 0x7f7f7f));
+    voxel_color(&v, 'w', 0xf2f2f2); voxel_color(&v, 'a', 0x2a64e0);
     voxel_caja(&v, 0, 1, 0, 8, 3, 16, 'c');          // carrocería
-    voxel_caja(&v, 1, 4, 3, 6, 2, 8, 'g');           // cabina (vidrios)
-    voxel_caja(&v, 1, 6, 3, 6, 1, 8, 'd');           // techo
-    voxel_caja(&v, 1, 4, 3, 6, 2, 1, 'd');           // pilares
-    voxel_caja(&v, 1, 4, 10, 6, 2, 1, 'd');
+    if (tipo == 1) {                                  // camioneta: cabina adelante, caja atrás
+        voxel_caja(&v, 1, 4, 8, 6, 2, 5, 'g'); voxel_caja(&v, 1, 6, 8, 6, 1, 5, 'd');
+        voxel_caja(&v, 1, 4, 8, 6, 2, 1, 'd'); voxel_caja(&v, 1, 4, 12, 6, 2, 1, 'd');
+        voxel_caja(&v, 1, 4, 0, 6, 1, 7, 'd'); voxel_caja(&v, 1, 4, 1, 6, 1, 5, '.');
+        voxel_caja(&v, 0, 4, 0, 1, 1, 7, 'c'); voxel_caja(&v, 7, 4, 0, 1, 1, 7, 'c'); voxel_caja(&v, 1, 4, 0, 6, 1, 1, 'c');
+    } else {
+        voxel_caja(&v, 1, 4, 3, 6, 2, 8, 'g');       // cabina (vidrios)
+        voxel_caja(&v, 1, 6, 3, 6, 1, 8, (tipo == 2) ? 'a' : 'd');   // techo
+        voxel_caja(&v, 1, 4, 3, 6, 2, 1, 'd');       // pilares
+        voxel_caja(&v, 1, 4, 10, 6, 2, 1, 'd');
+        if (tipo == 2) {                              // patrulla: franja blanca y luces
+            voxel_caja(&v, 0, 2, 4, 8, 1, 7, 'w');
+            voxel_caja(&v, 2, 7, 6, 2, 1, 2, 'r'); voxel_caja(&v, 4, 7, 6, 2, 1, 2, 'a');
+        }
+    }
     voxel_caja(&v, 0, 0, 0, 8, 1, 16, 'm');          // parachoques / bajos
     voxel_caja(&v, 0, 0, 2, 1, 2, 3, 'k'); voxel_caja(&v, 7, 0, 2, 1, 2, 3, 'k');     // ruedas
     voxel_caja(&v, 0, 0, 11, 1, 2, 3, 'k'); voxel_caja(&v, 7, 0, 11, 1, 2, 3, 'k');
@@ -65,7 +77,7 @@ void vehiculos_iniciar(float cx, float cz) {
                 k->x = x; k->z = z; k->vel = 0.0f;
                 k->ang = hor ? 90.0f : 0.0f;
                 malla_iniciar(&k->malla);
-                armar_carro(&k->malla, COLORES[n_carros % 8]);
+                { int tp = n_carros % 3; armar_carro(&k->malla, tp == 2 ? 0x1f3f8a : COLORES[n_carros % 8], tp); }
                 n_carros++;
             }
         }

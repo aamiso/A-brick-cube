@@ -20,3 +20,12 @@ Camara GTA (se ve de pies a cabeza) y camara al hombro (L). Correr (R), saltar (
 
 --- 00.54 ---
 Carros solidos, camara de conduccion tipo GTA, animacion de subir/bajar del carro, camara sin ver dentro de edificios.
+
+--- 00.57 ---
+Modelos hechos a mano: hospital(Y) edificio rojo(R) torre dorada(V) farmacia(M) hotel(U). Calles de 12 de ancho. Arboles voxel nuevos. Carros: sedan, camioneta, patrulla. Mallas con caras unidas (menos triangulos). Los modelos se regeneran con tools/hacer_modelos.py
+
+--- 00.58 ---
+Suelo con profundidad por capas (sin transparencias). Fisica de salto: se puede subir a lo que alcance el salto (hasta ~1.5 de alto); cae al salir del borde.
+
+--- 00.59 ---
+Modelos nuevos: torres gemelas(O) oficina moderna(I) edificio colorido(Z) centro comercial(s).

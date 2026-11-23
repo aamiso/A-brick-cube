@@ -26,6 +26,8 @@ void lugares_agregar(char letra, float x, float z, float w, float d);
 void lugares_dibujar(float px, float pz);
 
 // 1 si un círculo toca una pared, columna, arbusto, etc. de un lugar
+int lugares_choca_y(float x, float z, float radio, float y);
+float lugares_piso(float x, float z, float radio, float y);
 int lugares_choca(float x, float z, float radio);
 
 // Altura de lo que hay en ese punto (0 si nada). La usa la cámara.

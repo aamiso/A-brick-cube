@@ -12,6 +12,8 @@ def rect(x0, z0, w, d, ch):
         for x in range(x0, x0 + w):
             if 0 <= x < N and 0 <= z < N: m[z][x] = ch
 
+CALLE, VIA = 12, 8      # ancho total de la calle (con aceras) y de la parte de asfalto
+ACE = (CALLE - VIA) // 2
 # ---- 1) cuadrícula de calles ----
 def cortes():
     pos, v = [], 0
@@ -26,28 +28,28 @@ def cortes():
 # calles verticales y horizontales: [inicio_calle]
 def lineas():
     xs, x = [], 3
-    while x + 6 + 30 <= N - 3:
+    while x + CALLE + 30 <= N - 3:
         xs.append(x)
-        x += 6 + random.choice([30, 36, 42])
+        x += CALLE + random.choice([30, 36, 42])
     xs.append(x)  # última calle
     return xs
 xs, zs = lineas(), lineas()
 # ajustar para que la última calle quepa
-xs = [x for x in xs if x + 6 <= N - 3]; zs = [z for z in zs if z + 6 <= N - 3]
-for z in zs: rect(0, z, N, 6, 'S'); rect(0, z + 1, N, 4, '=') ; 
-for x in xs: rect(x, 0, 6, N, 'S'); rect(x + 1, 0, 4, N, '=')
+xs = [x for x in xs if x + CALLE <= N - 3]; zs = [z for z in zs if z + CALLE <= N - 3]
+for z in zs: rect(0, z, N, CALLE, 'S'); rect(0, z + ACE, N, VIA, '=')
+for x in xs: rect(x, 0, CALLE, N, 'S'); rect(x + ACE, 0, VIA, N, '=')
 # las aceras de los cruces quedan como calle
 for z in zs:
     for x in xs:
-        rect(x, z, 6, 6, 'S'); rect(x + 1, z + 1, 4, 4, '=')
-        rect(x, z + 1, 6, 4, '='); rect(x + 1, z, 4, 6, '=')
+        rect(x, z, CALLE, CALLE, 'S'); rect(x + ACE, z + ACE, VIA, VIA, '=')
+        rect(x, z + ACE, CALLE, VIA, '='); rect(x + ACE, z, VIA, CALLE, '=')
 # las calles llegan hasta el borde: deja un borde de 3 de pasto
 rect(0, 0, N, 3, '.'); rect(0, N - 3, N, 3, '.'); rect(0, 0, 3, N, '.'); rect(N - 3, 0, 3, N, '.')
 
 # ---- 2) manzanas ----
 def manzanas():
-    bx = [(xs[i] + 6, xs[i + 1] - 1) for i in range(len(xs) - 1)]
-    bz = [(zs[i] + 6, zs[i + 1] - 1) for i in range(len(zs) - 1)]
+    bx = [(xs[i] + CALLE, xs[i + 1] - 1) for i in range(len(xs) - 1)]
+    bz = [(zs[i] + CALLE, zs[i + 1] - 1) for i in range(len(zs) - 1)]
     return [(a0, b0, a1 - a0 + 1, b1 - b0 + 1) for (a0, a1) in bx for (b0, b1) in bz]
 bl = manzanas()
 cx0 = cz0 = N / 2
@@ -80,9 +82,9 @@ def subdividir(x0, z0, w, d, minimo):
         return subdividir(x0, z0, w, c, minimo) + subdividir(x0, z0 + c, w, d - c, minimo)
     return [(x0, z0, w, d)]
 
-TAM = {'H': (10, 9), 'J': (11, 11), 'K': (13, 11), 'X': (15, 13), 'Q': (16, 14)}
-cuenta = {'X': 0, 'Q': 0}
-LIMITE = {'X': 6, 'Q': 12}
+TAM = {'H': (10, 9), 'J': (11, 11), 'K': (13, 11), 'X': (15, 13), 'Q': (16, 14), 'Y': (22, 16), 'R': (9, 9), 'V': (14, 14), 'M': (12, 10), 'U': (16, 14), 'O': (20, 15), 'I': (16, 14), 'Z': (12, 12), 's': (14, 12)}
+cuenta = {'X': 0, 'Q': 0, 'Y': 0, 'R': 0, 'V': 0, 'M': 0, 'U': 0, 'O': 0, 'I': 0, 'Z': 0, 's': 0}
+LIMITE = {'X': 5, 'Q': 10, 'Y': 2, 'R': 10, 'V': 4, 'M': 6, 'U': 4, 'O': 3, 'I': 6, 'Z': 10, 's': 6}
 def lugar_modelo(a, b, c, e, letras, prob):
     """Pone un lugar con modelo (rectángulo exacto) dentro del lote si cabe."""
     if random.random() > prob: return False
@@ -129,17 +131,24 @@ for i in idx:
             rect(a + 1, b + 1, c - 2, e - 2, random.choice('GBG'))
         continue
     if dist < 55:      # centro: rascacielos
-        for (a, b, c, e) in subdividir(x0, z0, w, d, 12):
-            if not lugar_modelo(a, b, c, e, 'XQ', 0.40): lote(a, b, c, e, 'EEDDFNA', 10, 18)
+        lotes = subdividir(x0, z0, w, d, 12)
+        grande = [k for k in 'YO' if cuenta[k] < LIMITE[k]]
+        if grande and w >= 24 and d >= 18 and random.random() < 0.7:
+            k = random.choice(grande); kw, kd = TAM[k]
+            rect(x0 + 1, z0 + 1, kw, kd, k); cuenta[k] += 1         # hospital / torres gemelas
+            lotes = subdividir(x0 + kw + 2, z0, w - kw - 2, d, 9) + subdividir(x0, z0 + kd + 2, kw + 2, d - kd - 2, 9)
+            lotes = [l for l in lotes if l[2] >= 12 and l[3] >= 12]
+        for (a, b, c, e) in lotes:
+            if not lugar_modelo(a, b, c, e, 'YVUXQROIZs', 0.65): lote(a, b, c, e, 'EEDDFNA', 10, 18)
     elif dist < 105:   # anillo medio: oficinas, departamentos, tiendas, bancos y cafés
-        for (a, b, c, e) in subdividir(x0, z0, w, d, 9):
-            if not lugar_modelo(a, b, c, e, 'XQQ', 0.60): lote(a, b, c, e, 'ABFLLCNB', 8, 13)
+        for (a, b, c, e) in subdividir(x0, z0, w, d, 10):
+            if not lugar_modelo(a, b, c, e, 'RRMMXQUZZssI', 0.70): lote(a, b, c, e, 'ABFLLCNB', 8, 13)
     else:              # afueras: casas con modelo y jardín
         for (a, b, c, e) in subdividir(x0, z0, w, d, 12):
             if random.random() < 0.10:
                 for _ in range(c * e // 8): arbol_en(random.randint(a, a + c - 1), random.randint(b, b + e - 1))
                 continue
-            if not lugar_modelo(a, b, c, e, 'HJK', 1.0):
+            if not lugar_modelo(a, b, c, e, 'HJKM', 1.0):
                 for _ in range(c * e // 10): arbol_en(random.randint(a, a + c - 1), random.randint(b, b + e - 1))
                 continue
             for _ in range(random.randint(2, 6)):

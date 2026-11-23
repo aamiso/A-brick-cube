@@ -32,6 +32,15 @@ static Tipo tipos[] = {
     {'K', "casa_moderna.txt", {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
     {'X', "banco.txt",        {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
     {'Q', "cafe.txt",         {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
+    {'Y', "hospital.txt",     {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
+    {'R', "edificio_rojo.txt",{0}, {0}, 0, 0, 0, 0, 0, 0, 0},
+    {'V', "torre_dorada.txt", {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
+    {'M', "farmacia.txt",     {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
+    {'U', "hotel.txt",        {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
+    {'O', "torres_gemelas.txt",   {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
+    {'I', "oficina_moderna.txt",  {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
+    {'Z', "edificio_colorido.txt",{0}, {0}, 0, 0, 0, 0, 0, 0, 0},
+    {'s', "centro_comercial.txt", {0}, {0}, 0, 0, 0, 0, 0, 0, 0},
 };
 #define N_TIPOS ((int)(sizeof(tipos) / sizeof(tipos[0])))
 
@@ -134,7 +143,10 @@ static int cols(const Lugar *l, const Tipo *t, float x, float r, int *c0, int *c
     return *c0 <= *c1;
 }
 
-int lugares_choca(float x, float z, float radio) {
+#define PASO_MAX 0.35f   // un escalón de hasta esto se sube caminando
+
+// 1 si algo sólido toca el círculo y sobresale por encima de la altura "y" + un escalón
+int lugares_choca_y(float x, float z, float radio, float y) {
     for (int i = 0; i < n_lugares; i++) {
         const Lugar *l = &lugares[i];
         const Tipo *t = &tipos[l->tipo];
@@ -147,6 +159,7 @@ int lugares_choca(float x, float z, float radio) {
         for (int f = f0; f <= f1; f++) {
             for (int c = c0; c <= c1; c++) {
                 if (!t->solido[f * t->vox.W + c]) continue;
+                if (t->altura[f * t->vox.W + c] <= y + PASO_MAX) continue;   // se puede subir encima
                 float cx = l->x + (c + 0.5f - t->vox.W * 0.5f) * LADO;
                 float cz = l->z + (f + 0.5f - t->vox.D * 0.5f) * LADO;
                 float h = LADO * 0.5f;
@@ -158,6 +171,30 @@ int lugares_choca(float x, float z, float radio) {
         }
     }
     return 0;
+}
+
+int lugares_choca(float x, float z, float radio) { return lugares_choca_y(x, z, radio, 0.0f); }
+
+// Altura del piso bajo el círculo: lo más alto que se puede pisar (hasta y + un escalón)
+float lugares_piso(float x, float z, float radio, float y) {
+    float mejor = 0.0f;
+    for (int i = 0; i < n_lugares; i++) {
+        const Lugar *l = &lugares[i];
+        const Tipo *t = &tipos[l->tipo];
+        if (!t->cargado) continue;
+        float mx = t->vox.W * LADO * 0.5f, mz = t->vox.D * LADO * 0.5f;
+        if (fabsf(x - l->x) > mx + radio || fabsf(z - l->z) > mz + radio) continue;
+        int c0, c1, f0, f1;
+        if (!cols(l, t, x, radio, &c0, &c1, 0)) continue;
+        if (!cols(l, t, z, radio, &f0, &f1, 1)) continue;
+        for (int f = f0; f <= f1; f++)
+            for (int c = c0; c <= c1; c++) {
+                if (!t->solido[f * t->vox.W + c]) continue;
+                float h = t->altura[f * t->vox.W + c];
+                if (h <= y + PASO_MAX && h > mejor) mejor = h;
+            }
+    }
+    return mejor;
 }
 
 float lugares_altura(float x, float z) {

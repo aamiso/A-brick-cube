@@ -26,7 +26,7 @@ void suelo_dibujar(float px, float pz) {
             for (float z = 0.0f; z < H; z += CUADRO, j++) {
                 float largo = (z + CUADRO > H) ? (H - z) : CUADRO;
                 int par = ((i + j) & 1) == 0;
-                malla_tapa(&pasto, x + ancho * 0.5f - W * 0.5f, 0.0f, z + largo * 0.5f - H * 0.5f,
+                malla_tapa(&pasto, x + ancho * 0.5f - W * 0.5f, -0.03f, z + largo * 0.5f - H * 0.5f,
                            ancho, largo, par ? 0.42f : 0.38f, par ? 0.76f : 0.71f, par ? 0.30f : 0.27f);
             }
         }

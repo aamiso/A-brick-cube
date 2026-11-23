@@ -16,6 +16,7 @@ void camara_iniciar(Camara *c) {
     c->real = 6.5f;
     c->alto_real = 10.0f;
     c->hombro = 0;
+    c->py = 0.0f;
     c->sin_choque = 0;
     c->desvio = 0.0f;
 }
@@ -67,20 +68,20 @@ static float alcance(float px, float pz, float alto, float giro, float dist) {
 }
 
 // Hasta dónde llega la cámara sin tocar nada (afina el punto exacto)
-static float libre_hasta(float px, float pz, float alto, float giro, float dist, float desvio) {
+static float libre_hasta(float px, float py, float pz, float alto, float giro, float dist, float desvio) {
     float a = alto * PI_ / 180.0f, g = giro * PI_ / 180.0f;
     float dx = -cosf(a) * sinf(g), dy = sinf(a), dz = cosf(a) * cosf(g);
     float rx = cosf(g) * desvio, rz = sinf(g) * desvio;   // la cámara al hombro está corrida a un lado
     float ok = 0.0f, mal = -1.0f;
     for (int k = 1; k <= 40; k++) {
         float t = dist * k / 40.0f;
-        if (bloqueado(px + dx * t + rx, 1.0f + dy * t, pz + dz * t + rz, t >= 1.0f)) { mal = t; break; }
+        if (bloqueado(px + dx * t + rx, 1.0f + py + dy * t, pz + dz * t + rz, t >= 1.0f)) { mal = t; break; }
         ok = t;
     }
     if (mal < 0.0f) return dist;
     for (int i = 0; i < 4; i++) {
         float t = (ok + mal) * 0.5f;
-        if (bloqueado(px + dx * t + rx, 1.0f + dy * t, pz + dz * t + rz, t >= 1.0f)) mal = t; else ok = t;
+        if (bloqueado(px + dx * t + rx, 1.0f + py + dy * t, pz + dz * t + rz, t >= 1.0f)) mal = t; else ok = t;
     }
     return ok - 0.15f;
 }
@@ -89,7 +90,7 @@ void camara_aplicar(Camara *c, float px, float pz) {
     // La inclinación NO cambia: si algo estorba, la cámara solo se acerca al jugador.
     c->alto_real = c->alto;
     // la cámara nunca baja del suelo: si la inclinación la metería bajo tierra, se acerca
-    float meta = libre_hasta(px, pz, c->alto, c->giro, c->distancia, c->desvio);
+    float meta = libre_hasta(px, c->py, pz, c->alto, c->giro, c->distancia, c->desvio);
     if (c->sin_choque) meta = c->distancia;
     if (meta < DIST_MIN) meta = DIST_MIN;
     // Suave en los dos sentidos (así no da tirones): se acerca rápido y se aleja despacio
@@ -101,5 +102,5 @@ void camara_aplicar(Camara *c, float px, float pz) {
     glTranslatef(-c->desvio, -0.15f * c->desvio, -c->real);
     glRotatef(c->alto_real, 1.0f, 0.0f, 0.0f);
     glRotatef(c->giro, 0.0f, 1.0f, 0.0f);
-    glTranslatef(-px, -1.0f, -pz);
+    glTranslatef(-px, -1.0f - c->py, -pz);
 }

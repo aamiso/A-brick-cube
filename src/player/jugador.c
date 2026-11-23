@@ -1,4 +1,5 @@
 #include "player/jugador.h"
+#include <vitaGL.h>
 #include "player/personaje.h"
 #include "world/suelo.h"
 #include "world/ciudad.h"
@@ -19,6 +20,7 @@ void jugador_iniciar(Jugador *j) {
     j->tiempo = 0.0f;
     j->elev = 0.0f;
     j->vy = 0.0f;
+    j->suelo = 0.0f;
     if (!personaje.listo) personaje_crear(&personaje, 0xd9382c, 0x2f62c9, 0xf2c230, 0x5a3a22);
 }
 
@@ -40,8 +42,8 @@ void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara, int c
         objetivo = fuerza * turbo;
         // Se mueve en X y en Z por separado: si choca de frente, todavía se desliza por la pared.
         float paso_x = dx * 0.15f * turbo, paso_z = dz * 0.15f * turbo;
-        if (!ciudad_choca(j->x + paso_x, j->z, RADIO) && !vehiculos_choca(j->x + paso_x, j->z, RADIO, -1)) j->x += paso_x;
-        if (!ciudad_choca(j->x, j->z + paso_z, RADIO) && !vehiculos_choca(j->x, j->z + paso_z, RADIO, -1)) j->z += paso_z;
+        if (!ciudad_choca_y(j->x + paso_x, j->z, RADIO, j->elev) && !vehiculos_choca(j->x + paso_x, j->z, RADIO, -1)) j->x += paso_x;
+        if (!ciudad_choca_y(j->x, j->z + paso_z, RADIO, j->elev) && !vehiculos_choca(j->x, j->z + paso_z, RADIO, -1)) j->z += paso_z;
 
         // Gira suave hacia donde camina (por el camino más corto)
         float meta = atan2f(dx, dz) * 180.0f / PI;
@@ -51,12 +53,18 @@ void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara, int c
         j->angulo += dif * 0.30f;
         j->fase += 0.30f * fuerza * (correr ? 1.4f : 1.0f);
     }
-    // Salto
-    if (saltar && j->elev <= 0.001f) j->vy = 0.17f;
-    if (j->elev > 0.0f || j->vy > 0.0f) {
+    // Física vertical: se para sobre lo más alto que alcanza; si no hay piso, cae.
+    float piso = ciudad_piso(j->x, j->z, RADIO, j->elev);
+    if (saltar && j->elev <= piso + 0.02f && j->vy <= 0.0f) j->vy = 0.17f;
+    if (j->elev > piso + 0.001f || j->vy > 0.0f) {
         j->elev += j->vy; j->vy -= 0.012f;
-        if (j->elev <= 0.0f) { j->elev = 0.0f; j->vy = 0.0f; }
+        float nuevo_piso = ciudad_piso(j->x, j->z, RADIO, j->elev);
+        if (j->vy <= 0.0f && j->elev <= nuevo_piso) { j->elev = nuevo_piso; j->vy = 0.0f; }
+        piso = nuevo_piso;
+    } else {
+        j->elev = piso; j->vy = 0.0f;
     }
+    j->suelo = piso;
     // La velocidad sube y baja poco a poco (así no se ve brusco)
     j->vel += (objetivo - j->vel) * 0.15f;
     if (objetivo == 0.0f && j->vel < 0.02f) { j->vel = 0.0f; j->fase = 0.0f; }
@@ -65,5 +73,8 @@ void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara, int c
 }
 
 void jugador_dibujar(const Jugador *j) {
-    personaje_dibujar(&personaje, j->x, j->z, j->angulo, j->vel, j->fase, j->tiempo, j->elev);
+    glPushMatrix();
+    glTranslatef(0.0f, j->suelo, 0.0f);
+    personaje_dibujar(&personaje, j->x, j->z, j->angulo, j->vel, j->fase, j->tiempo, j->elev - j->suelo);
+    glPopMatrix();
 }

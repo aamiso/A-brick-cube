@@ -29,12 +29,14 @@ static int corrida(int c, int f, int dc, int df) {
     return n;
 }
 
+static float g_y = 0.0f;   // altura de la capa que se está armando
 static void rect(Malla *m, float x0, float z0, float x1, float z1, float r, float g, float b) {
-    malla_tapa(m, (x0 + x1) * 0.5f, 0.0f, (z0 + z1) * 0.5f, x1 - x0, z1 - z0, r, g, b);
+    malla_tapa(m, (x0 + x1) * 0.5f, g_y, (z0 + z1) * 0.5f, x1 - x0, z1 - z0, r, g, b);
 }
 
 static void celda_base(Malla *m, int c, int f) {
     char t = ciudad_tipo_en(c, f);
+    g_y = (t == '=' || t == 'S' || t == 'W') ? 0.06f : -0.015f;
     float x0 = ciudad_centro_x(c) - 0.5f, z0 = ciudad_centro_z(f) - 0.5f;
     int par = (c + f) & 1;
     unsigned q = azar(c, f);
@@ -57,6 +59,7 @@ static void celda_base(Malla *m, int c, int f) {
 
 // Rayas, bordillos y cebras (van encima de la base)
 static void celda_detalle(Malla *m, int c, int f) {
+    g_y = 0.09f;
     char t = ciudad_tipo_en(c, f);
     float x0 = ciudad_centro_x(c) - 0.5f, z0 = ciudad_centro_z(f) - 0.5f;
 

@@ -142,26 +142,51 @@ static const Cara CARAS[5] = {
     {{-1, 0, 0}, BRILLO_IZQ,    {{0,0,0},{0,0,1},{0,1,1},{0,1,0}}},
 };
 
+// Une las caras vecinas del mismo color en rectángulos grandes (mucho menos triángulos).
 void voxel_malla(const Voxeles *vx, float lado, float ox, float oy, float oz, Malla *m) {
-    for (int y = 0; y < vx->H; y++) {
-        for (int z = 0; z < vx->D; z++) {
-            for (int x = 0; x < vx->W; x++) {
-                unsigned char letra = vx->v[((size_t)y * vx->D + z) * vx->W + x];
-                if (!letra) continue;
-                unsigned int rgb = vx->hay[letra] ? vx->pal[letra] : 0xff00ff;
-                float r = ((rgb >> 16) & 255) / 255.0f, g = ((rgb >> 8) & 255) / 255.0f, b = (rgb & 255) / 255.0f;
-                for (int f = 0; f < 5; f++) {
-                    const Cara *c = &CARAS[f];
-                    if (voxel_hay(vx, x + c->n[0], y + c->n[1], z + c->n[2])) continue;
+    const int dim[3] = { vx->W, vx->H, vx->D };
+    const float org[3] = { ox, oy, oz };
+    static const int SA[5] = { 1, 2, 2, 0, 0 }, UA[5] = { 0, 0, 0, 2, 2 }, VA[5] = { 2, 1, 1, 1, 1 };
+    unsigned char *mask = (unsigned char *)malloc((size_t)(vx->W > vx->D ? vx->W : vx->D) * (vx->H > vx->D ? vx->H : vx->D) * 2 + 16);
+    if (!mask) return;
+    for (int f = 0; f < 5; f++) {
+        const Cara *c = &CARAS[f];
+        int sa = SA[f], ua = UA[f], va = VA[f];
+        int nu = dim[ua], nv = dim[va];
+        for (int sl = 0; sl < dim[sa]; sl++) {
+            int idx[3];
+            for (int v = 0; v < nv; v++)
+                for (int u = 0; u < nu; u++) {
+                    idx[sa] = sl; idx[ua] = u; idx[va] = v;
+                    unsigned char l = vx->v[((size_t)idx[1] * vx->D + idx[2]) * vx->W + idx[0]];
+                    if (l && voxel_hay(vx, idx[0] + c->n[0], idx[1] + c->n[1], idx[2] + c->n[2])) l = 0;
+                    mask[v * nu + u] = l;
+                }
+            for (int v = 0; v < nv; v++)
+                for (int u = 0; u < nu; u++) {
+                    unsigned char l = mask[v * nu + u];
+                    if (!l) continue;
+                    int du = 1, dv = 1;
+                    while (u + du < nu && mask[v * nu + u + du] == l) du++;
+                    for (; v + dv < nv; dv++) {
+                        int ok = 1;
+                        for (int k = 0; k < du; k++) if (mask[(v + dv) * nu + u + k] != l) { ok = 0; break; }
+                        if (!ok) break;
+                    }
+                    for (int j = 0; j < dv; j++) for (int k = 0; k < du; k++) mask[(v + j) * nu + u + k] = 0;
+                    unsigned int rgb = vx->hay[l] ? vx->pal[l] : 0xff00ff;
+                    float r = ((rgb >> 16) & 255) / 255.0f, g = ((rgb >> 8) & 255) / 255.0f, b = (rgb & 255) / 255.0f;
                     float q[4][3];
                     for (int k = 0; k < 4; k++) {
-                        q[k][0] = (x + c->v[k][0] - ox) * lado;
-                        q[k][1] = (y + c->v[k][1] - oy) * lado;
-                        q[k][2] = (z + c->v[k][2] - oz) * lado;
+                        float pos[3];
+                        pos[sa] = sl + c->v[k][sa];
+                        pos[ua] = u + c->v[k][ua] * du;
+                        pos[va] = v + c->v[k][va] * dv;
+                        for (int e = 0; e < 3; e++) q[k][e] = (pos[e] - org[e]) * lado;
                     }
                     malla_quad(m, q[0], q[1], q[2], q[3], r * c->b, g * c->b, b * c->b);
                 }
-            }
         }
     }
+    free(mask);
 }

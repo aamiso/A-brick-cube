@@ -8,6 +8,7 @@ typedef struct {
     float distancia; // qué tan lejos QUIERE estar del jugador
     float real;      // qué tan lejos está de verdad (se acerca si hay un edificio atrás)
     float alto_real; // inclinación real
+    float py;         // altura del piso donde está el jugador (la cámara la sigue suave)
     int   sin_choque; // 1 = distancia fija (en el carro): no se acerca por árboles ni edificios
     int   hombro;    // 0 = cámara normal (GTA), 1 = cámara sobre el hombro (Batman)
     float desvio;    // cuánto se corre hacia un lado (suave)

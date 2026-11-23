@@ -8,7 +8,8 @@ typedef struct {
     float vel;      // 0 parado ... 1 a toda velocidad (suavizado)
     float fase;     // avanza al caminar (mueve piernas y brazos)
     float tiempo;   // segundos desde que empezó (respiración, mirar alrededor)
-    float elev, vy; // altura del salto y velocidad vertical
+    float elev, vy; // altura sobre el suelo (absoluta) y velocidad vertical
+    float suelo;    // altura del piso donde está parado
 } Jugador;
 
 void jugador_iniciar(Jugador *j);

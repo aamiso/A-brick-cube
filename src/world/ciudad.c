@@ -148,9 +148,9 @@ static void armar_lejano(void) {
         for (int i = 0; i < n_bloques; i++) {
             const Bloque *b = &bloques[i];
             if (b->tipo != quiero) continue;
-            if (quiero == 'W')      malla_tapa(&lejano, b->x, 0.0f, b->z, b->w, b->d, 0.18f, 0.48f, 0.86f);
-            else if (quiero == '=') malla_tapa(&lejano, b->x, 0.0f, b->z, b->w, b->d, 0.30f, 0.31f, 0.34f);
-            else                    malla_tapa(&lejano, b->x, 0.0f, b->z, b->w, b->d, 0.72f, 0.71f, 0.68f);
+            if (quiero == 'W')      malla_tapa(&lejano, b->x, 0.03f, b->z, b->w, b->d, 0.18f, 0.48f, 0.86f);
+            else if (quiero == '=') malla_tapa(&lejano, b->x, 0.03f, b->z, b->w, b->d, 0.30f, 0.31f, 0.34f);
+            else                    malla_tapa(&lejano, b->x, 0.03f, b->z, b->w, b->d, 0.72f, 0.71f, 0.68f);
         }
     }
     malla_subir(&lejano);
@@ -263,27 +263,59 @@ static void cargar_emergencia(void) {
     armar_bloques();
 }
 
-// Árboles de cubitos: 3 formas distintas
-static Malla arbol_malla[3];
+// Árboles de cubitos (cada uno con su propio diseño, como en las referencias)
+#define N_ARBOLES 4
+static Malla arbol_malla[N_ARBOLES];
 static int arboles_listos = 0;
+
+static void arbol_hacer(int n, void (*forma)(Voxeles *)) {
+    Voxeles v;
+    voxel_crear(&v, 13, 13, 18);
+    voxel_color(&v, 't', 0x6b4a2f); voxel_color(&v, 'T', 0x8a6a42);
+    voxel_color(&v, 'a', 0x7ccd2e); voxel_color(&v, 'b', 0x5fb524); voxel_color(&v, 'c', 0x3f9a3a);
+    voxel_color(&v, 'd', 0x2e7d3a); voxel_color(&v, 'e', 0x1f6a34); voxel_color(&v, 'w', 0xe8d9b8); voxel_color(&v, 'x', 0x8d7a5e);
+    voxel_color(&v, 'f', 0xf4a6c8);
+    forma(&v);
+    malla_iniciar(&arbol_malla[n]);
+    voxel_malla(&v, 0.25f, 6.5f, 0.0f, 6.5f, &arbol_malla[n]);
+    voxel_liberar(&v);
+}
+// 0: copa de cubos grandes (árbol de bloques)
+static void forma0(Voxeles *v) {
+    voxel_caja(v, 5, 0, 5, 3, 5, 3, 't');
+    voxel_caja(v, 4, 4, 4, 5, 2, 5, 'x');
+    voxel_caja(v, 2, 6, 2, 9, 5, 9, 'a');
+    voxel_caja(v, 3, 11, 3, 7, 2, 7, 'b');
+    voxel_caja(v, 1, 7, 5, 2, 3, 4, 'c');
+    voxel_caja(v, 10, 8, 4, 2, 3, 4, 'c');
+}
+// 1: pino por pisos
+static void forma1(Voxeles *v) {
+    voxel_caja(v, 6, 0, 6, 2, 3, 2, 't');
+    voxel_caja(v, 1, 3, 1, 11, 2, 11, 'e');
+    voxel_caja(v, 2, 5, 2, 9, 2, 9, 'd');
+    voxel_caja(v, 3, 7, 3, 7, 2, 7, 'c');
+    voxel_caja(v, 4, 9, 4, 5, 2, 5, 'b');
+    voxel_caja(v, 5, 11, 5, 3, 2, 3, 'a');
+    voxel_caja(v, 6, 13, 6, 1, 1, 1, 'a');
+}
+// 2: abedul: tronco claro con rayas y copa cúbica
+static void forma2(Voxeles *v) {
+    for (int y = 0; y < 9; y++) voxel_caja(v, 6, y, 6, 2, 1, 2, (y % 3 == 1) ? 'x' : 'w');
+    voxel_caja(v, 3, 9, 3, 8, 7, 8, 'a');
+    voxel_caja(v, 4, 16, 4, 6, 1, 6, 'b');
+}
+// 3: roble pequeño con flores
+static void forma3(Voxeles *v) {
+    voxel_caja(v, 5, 0, 5, 3, 4, 3, 't');
+    voxel_caja(v, 3, 4, 5, 2, 3, 3, 't'); voxel_caja(v, 8, 4, 5, 2, 3, 3, 't');
+    voxel_caja(v, 1, 6, 3, 6, 4, 7, 'b'); voxel_caja(v, 7, 6, 3, 6, 4, 7, 'a');
+    voxel_caja(v, 3, 9, 4, 7, 3, 6, 'c');
+    voxel_poner(v, 2, 7, 2, 'f'); voxel_poner(v, 10, 8, 2, 'f'); voxel_poner(v, 5, 11, 3, 'f'); voxel_poner(v, 11, 6, 6, 'f');
+}
 static void armar_arboles(void) {
     if (arboles_listos) return;
-    for (int i = 0; i < 3; i++) malla_iniciar(&arbol_malla[i]);
-    // 0: redondo
-    malla_caja(&arbol_malla[0], 0, 0.50f, 0, 0.30f, 1.00f, 0.30f, 0.45f, 0.30f, 0.15f);
-    malla_caja(&arbol_malla[0], 0, 1.45f, 0, 1.30f, 0.90f, 1.30f, 0.28f, 0.62f, 0.22f);
-    malla_caja(&arbol_malla[0], 0, 2.05f, 0, 0.90f, 0.50f, 0.90f, 0.36f, 0.70f, 0.26f);
-    malla_caja(&arbol_malla[0], 0.55f, 1.15f, 0.30f, 0.50f, 0.50f, 0.50f, 0.24f, 0.56f, 0.20f);
-    // 1: alto (pino)
-    malla_caja(&arbol_malla[1], 0, 0.40f, 0, 0.30f, 0.80f, 0.30f, 0.42f, 0.28f, 0.14f);
-    malla_caja(&arbol_malla[1], 0, 1.10f, 0, 1.40f, 0.60f, 1.40f, 0.14f, 0.45f, 0.24f);
-    malla_caja(&arbol_malla[1], 0, 1.70f, 0, 1.00f, 0.60f, 1.00f, 0.18f, 0.52f, 0.27f);
-    malla_caja(&arbol_malla[1], 0, 2.30f, 0, 0.60f, 0.60f, 0.60f, 0.22f, 0.60f, 0.30f);
-    // 2: chico y redondo, con flores
-    malla_caja(&arbol_malla[2], 0, 0.30f, 0, 0.30f, 0.60f, 0.30f, 0.45f, 0.30f, 0.15f);
-    malla_caja(&arbol_malla[2], 0, 1.05f, 0, 1.10f, 0.90f, 1.10f, 0.34f, 0.68f, 0.26f);
-    malla_caja(&arbol_malla[2], 0.40f, 1.40f, 0.56f, 0.22f, 0.22f, 0.10f, 0.95f, 0.45f, 0.65f);
-    malla_caja(&arbol_malla[2], -0.30f, 0.95f, 0.56f, 0.22f, 0.22f, 0.10f, 0.98f, 0.85f, 0.30f);
+    arbol_hacer(0, forma0); arbol_hacer(1, forma1); arbol_hacer(2, forma2); arbol_hacer(3, forma3);
     arboles_listos = 1;
 }
 
@@ -481,7 +513,7 @@ static void armar_grupo(int gc, int gf) {
         if (c != gc || f != gf) continue;
         unsigned q = azar2((int)(x * 4), (int)(z * 4));
         float esc = 0.9f + (q % 5) * 0.05f;
-        malla_agregar(&g->m, &arbol_malla[(q >> 6) % 3], x, 0.0f, z, esc, (float)((q >> 3) % 4) * 90.0f);
+        malla_agregar(&g->m, &arbol_malla[(q >> 6) % N_ARBOLES], x, 0.0f, z, esc, (float)((q >> 3) % 4) * 90.0f);
     }
     malla_subir(&g->m);
     g->listo = 1;
@@ -533,7 +565,7 @@ void ciudad_dibujar(float px, float pz, float giro) {
 
 // ---------- Colisiones ----------
 
-int ciudad_choca(float x, float z, float radio) {
+int ciudad_choca_y(float x, float z, float radio, float y) {
     int c0 = (int)floorf((x - radio) / CIUDAD_TAM + ancho * 0.5f);
     int c1 = (int)floorf((x + radio) / CIUDAD_TAM + ancho * 0.5f);
     int f0 = (int)floorf((z - radio) / CIUDAD_TAM + alto * 0.5f);
@@ -552,8 +584,12 @@ int ciudad_choca(float x, float z, float radio) {
             if (dx * dx + dz * dz < radio * radio) return 1;
         }
     }
-    return lugares_choca(x, z, radio);
+    return lugares_choca_y(x, z, radio, y);
 }
+
+int ciudad_choca(float x, float z, float radio) { return ciudad_choca_y(x, z, radio, 0.0f); }
+
+float ciudad_piso(float x, float z, float radio, float y) { return lugares_piso(x, z, radio, y); }
 
 float ciudad_altura_en(float x, float z) {
     int col = (int)floorf(x / CIUDAD_TAM + ancho * 0.5f);

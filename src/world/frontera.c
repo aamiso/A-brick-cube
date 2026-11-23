@@ -22,7 +22,7 @@ static void franja(float x0, float x1, float z0, float z1,
             float d = fminf(LOSA, z1 - z);
             float cx = x + w * 0.5f, cz = z + d * 0.5f;
             float k = (((i + j) & 1) == 0) ? 1.0f : 1.0f - variacion;
-            malla_tapa(&suelo_m, cx, 0.0f, cz, w, d, r * k, g * k, b * k);
+            malla_tapa(&suelo_m, cx, -0.03f, cz, w, d, r * k, g * k, b * k);
         }
     }
 }
@@ -106,6 +106,7 @@ static void preparar(void) {
     if (listo) return;
     malla_iniciar(&suelo_m); malla_iniciar(&alto_m); malla_iniciar(&valla_m);
     armar_suelo(); armar_alto();
+    malla_tapa(&suelo_m, 0.0f, -0.3f, 0.0f, 3000.0f, 3000.0f, 0.30f, 0.62f, 0.25f);
     malla_subir(&suelo_m); malla_subir(&alto_m); malla_subir(&valla_m);
     listo = 1; w_ant = ciudad_ancho(); h_ant = ciudad_alto();
 }
