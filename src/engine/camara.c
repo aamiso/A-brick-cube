@@ -16,6 +16,7 @@ void camara_iniciar(Camara *c) {
     c->real = 6.5f;
     c->alto_real = 10.0f;
     c->hombro = 0;
+    c->sin_choque = 0;
     c->desvio = 0.0f;
 }
 
@@ -89,6 +90,7 @@ void camara_aplicar(Camara *c, float px, float pz) {
     c->alto_real = c->alto;
     // la cámara nunca baja del suelo: si la inclinación la metería bajo tierra, se acerca
     float meta = libre_hasta(px, pz, c->alto, c->giro, c->distancia, c->desvio);
+    if (c->sin_choque) meta = c->distancia;
     if (meta < DIST_MIN) meta = DIST_MIN;
     // Suave en los dos sentidos (así no da tirones): se acerca rápido y se aleja despacio
     float k = (meta < c->real) ? 0.60f : 0.05f;
