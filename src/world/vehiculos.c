@@ -135,7 +135,9 @@ void vehiculo_manejar(int n, float lx, float ly, int freno) {
 
     // El volante gira más cuanto más rápido va (y no gira parado)
     float v = fabsf(k->vel) / VEL_MAX;
-    float giro = -lx * 3.4f * sqrtf(v < 0.25f ? v * 2.0f : 0.5f + v * 0.5f);
+    // Volante suave: poco giro con el stick a medias, y menos giro a toda velocidad
+    float fino = lx * fabsf(lx);
+    float giro = -fino * 2.0f * sqrtf(v < 0.25f ? v * 2.0f : 0.5f + v * 0.5f) * (1.0f - 0.35f * v);
     if (k->vel < 0.0f) giro = -giro;
     float nuevo = k->ang + giro;
     if (!choca(n, k->x, k->z, nuevo)) k->ang = nuevo;

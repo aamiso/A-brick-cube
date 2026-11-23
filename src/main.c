@@ -52,7 +52,8 @@ int main(void) {
         prev = pad.buttons;
         float lx = leer_stick(pad.lx), ly = leer_stick(pad.ly);
         float rx = leer_stick(pad.rx), ry = leer_stick(pad.ry);
-        camara_actualizar(&camara, rx, ry, (nuevos & SCE_CTRL_LTRIGGER) != 0);
+        // En el carro la cámara va fija detrás (como GTA): el stick derecho no la mueve
+        camara_actualizar(&camara, en_carro >= 0 ? 0.0f : rx, en_carro >= 0 ? 0.0f : ry, en_carro >= 0 ? 0 : (nuevos & SCE_CTRL_LTRIGGER) != 0);
         float fx = jugador.x, fz = jugador.z;   // lo que sigue la cámara
 
         if (anim > 0) {
@@ -89,7 +90,10 @@ int main(void) {
             vehiculo_manejar(en_carro, lx, ly, (pad.buttons & SCE_CTRL_SQUARE) != 0);
             vehiculo_pos(en_carro, &fx, &fz, &ang, &vel);
             camara.dist_meta = 8.0f;
-            if (fabsf(rx) < 0.05f && fabsf(vel) > 0.03f) camara_seguir(&camara, ang, 0.07f);
+            camara.hombro = 0;
+            camara_seguir(&camara, ang, 0.16f);
+            camara.alto += (11.0f - camara.alto) * 0.08f;
+            (void)vel;
             jugador.x = fx; jugador.z = fz; jugador.vel = 0.0f;
             if (nuevos & SCE_CTRL_TRIANGLE) {
                 // se baja por el lado derecho (o el primer lado libre)
