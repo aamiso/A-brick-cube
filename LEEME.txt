@@ -29,3 +29,6 @@ Suelo con profundidad por capas (sin transparencias). Fisica de salto: se puede 
 
 --- 00.59 ---
 Modelos nuevos: torres gemelas(O) oficina moderna(I) edificio colorido(Z) centro comercial(s).
+
+--- 00.60 ---
+Todos los modelos macizos (sin huecos), torres gemelas mas chicas, arboles sin huecos.

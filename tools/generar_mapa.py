@@ -82,7 +82,7 @@ def subdividir(x0, z0, w, d, minimo):
         return subdividir(x0, z0, w, c, minimo) + subdividir(x0, z0 + c, w, d - c, minimo)
     return [(x0, z0, w, d)]
 
-TAM = {'H': (10, 9), 'J': (11, 11), 'K': (13, 11), 'X': (15, 13), 'Q': (16, 14), 'Y': (22, 16), 'R': (9, 9), 'V': (14, 14), 'M': (12, 10), 'U': (16, 14), 'O': (20, 15), 'I': (16, 14), 'Z': (12, 12), 's': (14, 12)}
+TAM = {'H': (10, 9), 'J': (11, 11), 'K': (13, 11), 'X': (15, 13), 'Q': (16, 14), 'Y': (22, 16), 'R': (9, 9), 'V': (14, 14), 'M': (12, 10), 'U': (16, 14), 'O': (14, 11), 'I': (16, 14), 'Z': (12, 12), 's': (14, 12)}
 cuenta = {'X': 0, 'Q': 0, 'Y': 0, 'R': 0, 'V': 0, 'M': 0, 'U': 0, 'O': 0, 'I': 0, 'Z': 0, 's': 0}
 LIMITE = {'X': 5, 'Q': 10, 'Y': 2, 'R': 10, 'V': 4, 'M': 6, 'U': 4, 'O': 3, 'I': 6, 'Z': 10, 's': 6}
 def lugar_modelo(a, b, c, e, letras, prob):
@@ -142,7 +142,7 @@ for i in idx:
             if not lugar_modelo(a, b, c, e, 'YVUXQROIZs', 0.65): lote(a, b, c, e, 'EEDDFNA', 10, 18)
     elif dist < 105:   # anillo medio: oficinas, departamentos, tiendas, bancos y cafés
         for (a, b, c, e) in subdividir(x0, z0, w, d, 10):
-            if not lugar_modelo(a, b, c, e, 'RRMMXQUZZssI', 0.70): lote(a, b, c, e, 'ABFLLCNB', 8, 13)
+            if not lugar_modelo(a, b, c, e, 'RRMMXQUZZssIO', 0.70): lote(a, b, c, e, 'ABFLLCNB', 8, 13)
     else:              # afueras: casas con modelo y jardín
         for (a, b, c, e) in subdividir(x0, z0, w, d, 12):
             if random.random() < 0.10:

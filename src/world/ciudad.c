@@ -276,6 +276,17 @@ static void arbol_hacer(int n, void (*forma)(Voxeles *)) {
     voxel_color(&v, 'd', 0x2e7d3a); voxel_color(&v, 'e', 0x1f6a34); voxel_color(&v, 'w', 0xe8d9b8); voxel_color(&v, 'x', 0x8d7a5e);
     voxel_color(&v, 'f', 0xf4a6c8);
     forma(&v);
+    // sin huecos: cada columna se rellena entre su cubito más bajo y el más alto
+    for (int z = 0; z < v.D; z++)
+        for (int x = 0; x < v.W; x++) {
+            int top = -1;
+            for (int y = 0; y < v.H; y++) if (voxel_hay(&v, x, y, z)) top = y;
+            char abajo = 0;
+            for (int y = 0; y <= top; y++) {
+                if (voxel_hay(&v, x, y, z)) abajo = (char)v.v[((size_t)y * v.D + z) * v.W + x];
+                else if (abajo) voxel_poner(&v, x, y, z, abajo);
+            }
+        }
     malla_iniciar(&arbol_malla[n]);
     voxel_malla(&v, 0.25f, 6.5f, 0.0f, 6.5f, &arbol_malla[n]);
     voxel_liberar(&v);
