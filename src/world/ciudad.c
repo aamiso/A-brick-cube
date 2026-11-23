@@ -33,9 +33,9 @@
 #define MAX_BLOQUES 40000
 #define MAX_ARBOLES 20000
 
-#define RADIO_GRANDE  95.0f   // hasta dónde se dibujan edificios y calles lejanas
-#define RADIO_ARBOL   42.0f   // árboles
-#define BAKES_POR_CUADRO 3    // cuántos edificios nuevos se arman por cuadro (para no trabarse)
+#define RADIO_GRANDE  72.0f   // hasta dónde se dibujan edificios y calles lejanas
+#define RADIO_BORRA   120.0f  // los grupos más lejos que esto se borran de la memoria
+#define BAKES_POR_CUADRO 1    // cuántos grupos nuevos se arman por cuadro (para no trabarse)
 
 typedef struct { char letra; float h; float r, g, b; } TipoEdificio;
 
@@ -59,8 +59,6 @@ static float inicio_x = 0.0f, inicio_z = 0.0f;
 typedef struct {
     float x, z, w, d;
     char tipo;
-    char listo;      // 1 si ya se armó su malla
-    Malla malla;
 } Bloque;
 
 static Bloque bloques[MAX_BLOQUES];
@@ -68,6 +66,15 @@ static int n_bloques = 0;
 static float arboles[MAX_ARBOLES][2];
 static int n_arboles = 0;
 static int bakes_restantes = 0;
+
+// Los edificios y árboles se arman en grupos de 32 x 32 celdas: cada grupo es UNA sola malla
+// guardada en la memoria de video (así se dibuja con una sola llamada).
+#define GCH   16
+#define MAX_G 26
+typedef struct { Malla m; char listo; } Grupo;
+static Grupo grupos[MAX_G][MAX_G];
+static Malla lejano;            // calles, aceras y agua de todo el mapa (una sola malla)
+static int lejano_listo = 0;
 
 static const char *const MAPA_EMERGENCIA[] = {
     "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
@@ -115,8 +122,15 @@ static unsigned azar2(int a, int b) {
     return h ^ (h >> 16);
 }
 
+static void liberar_mallas(void) {
+    for (int f = 0; f < MAX_G; f++)
+        for (int c = 0; c < MAX_G; c++)
+            if (grupos[f][c].listo) { malla_liberar(&grupos[f][c].m); grupos[f][c].listo = 0; }
+    if (lejano_listo) { malla_liberar(&lejano); lejano_listo = 0; }
+}
+
 static void limpiar_mapa(void) {
-    for (int i = 0; i < n_bloques; i++) if (bloques[i].listo) malla_liberar(&bloques[i].malla);
+    liberar_mallas();
     memset(mapa, '.', sizeof(mapa));
     ancho = alto = 0;
     n_bloques = n_arboles = 0;
@@ -125,10 +139,28 @@ static void limpiar_mapa(void) {
 
 // ---------- Preparar el mapa para dibujarlo ----------
 
+// Calles, aceras y agua de todo el mapa en una sola malla (se pinta de lejos y de cerca)
+static void armar_lejano(void) {
+    malla_iniciar(&lejano);
+    for (int pasada = 0; pasada < 3; pasada++) {
+        char quiero = (pasada == 0) ? 'W' : (pasada == 1) ? '=' : 'S';
+        for (int i = 0; i < n_bloques; i++) {
+            const Bloque *b = &bloques[i];
+            if (b->tipo != quiero) continue;
+            if (quiero == 'W')      malla_tapa(&lejano, b->x, 0.0f, b->z, b->w, b->d, 0.18f, 0.48f, 0.86f);
+            else if (quiero == '=') malla_tapa(&lejano, b->x, 0.0f, b->z, b->w, b->d, 0.30f, 0.31f, 0.34f);
+            else                    malla_tapa(&lejano, b->x, 0.0f, b->z, b->w, b->d, 0.72f, 0.71f, 0.68f);
+        }
+    }
+    malla_subir(&lejano);
+    lejano_listo = 1;
+}
+
+
 static void armar_bloques(void) {
     static unsigned char usada[MAX_ALTO][MAX_ANCHO];
     memset(usada, 0, sizeof(usada));
-    for (int i = 0; i < n_bloques; i++) if (bloques[i].listo) malla_liberar(&bloques[i].malla);
+    liberar_mallas();
     n_bloques = 0;
     n_arboles = 0;
     lugares_limpiar();
@@ -195,11 +227,11 @@ static void armar_bloques(void) {
                 b->w = w * CIUDAD_TAM;
                 b->d = d * CIUDAD_TAM;
                 b->tipo = t;
-                b->listo = 0;
-                malla_iniciar(&b->malla);
             }
         }
     }
+
+    armar_lejano();
 
     if (!hay_inicio) {
         float mejor = 1e30f;
@@ -304,21 +336,9 @@ void ciudad_inicio(float *x, float *z) {
 
 // ---------- Dibujo del suelo lejano (cuando está cerca lo dibuja terreno.c) ----------
 
-static int cerca(const Bloque *b, float px, float pz, float radio) {
-    return fabsf(b->x - px) < radio + b->w * 0.5f && fabsf(b->z - pz) < radio + b->d * 0.5f;
-}
-
 void ciudad_dibujar_suelo(float px, float pz) {
-    for (int pasada = 0; pasada < 3; pasada++) {
-        char quiero = (pasada == 0) ? 'W' : (pasada == 1) ? '=' : 'S';
-        for (int i = 0; i < n_bloques; i++) {
-            const Bloque *b = &bloques[i];
-            if (b->tipo != quiero || !cerca(b, px, pz, RADIO_GRANDE)) continue;
-            if (quiero == 'W')      baldosa(b->x, 0.0f, b->z, b->w, b->d, 0.18f, 0.48f, 0.86f);
-            else if (quiero == '=') baldosa(b->x, 0.0f, b->z, b->w, b->d, 0.30f, 0.31f, 0.34f);
-            else                    baldosa(b->x, 0.0f, b->z, b->w, b->d, 0.72f, 0.71f, 0.68f);
-        }
-    }
+    (void)px; (void)pz;
+    if (lejano_listo) malla_dibujar(&lejano);
 }
 
 // ---------- Edificios con ventanas ----------
@@ -343,8 +363,7 @@ static void ventana(Malla *m, int lado, float u, float y0, float y1, float w, fl
     malla_quad(m, a, bb, c, d, r * br, g * br, b * br);
 }
 
-static void armar_fachada(Bloque *b, const TipoEdificio *e) {
-    Malla *m = &b->malla;
+static void armar_fachada(Malla *m, const Bloque *b, const TipoEdificio *e) {
     float h = e->h;
     int vidrio = (e->letra == 'E');
     float ww = vidrio ? 1.6f : 1.0f, hueco = vidrio ? 0.4f : 1.0f;
@@ -395,39 +414,71 @@ static void armar_fachada(Bloque *b, const TipoEdificio *e) {
     }
 }
 
-static void dibujar_bloque(Bloque *b, const TipoEdificio *e) {
-    if (!b->listo) {
-        if (bakes_restantes <= 0) return;   // se arma en el próximo cuadro
-        bakes_restantes--;
-        armar_fachada(b, e);
-        b->listo = 1;
-    }
-    malla_dibujar(&b->malla);
-}
-
-static void dibujar_arbol(float x, float z) {
-    unsigned q = azar2((int)(x * 4), (int)(z * 4));
-    float s = 0.9f + (q % 5) * 0.05f;
-    glPushMatrix();
-    glTranslatef(x, 0.0f, z);
-    glRotatef((float)((q >> 3) % 4) * 90.0f, 0.0f, 1.0f, 0.0f);
-    glScalef(s, s, s);
-    malla_dibujar(&arbol_malla[(q >> 6) % 3]);
-    glPopMatrix();
-}
-
-void ciudad_dibujar(float px, float pz) {
-    bakes_restantes = BAKES_POR_CUADRO;
+static void armar_grupo(int gc, int gf) {
+    Grupo *g = &grupos[gf][gc];
+    malla_iniciar(&g->m);
     for (int i = 0; i < n_bloques; i++) {
-        Bloque *b = &bloques[i];
+        const Bloque *b = &bloques[i];
         const TipoEdificio *e = edificio_de(b->tipo);
         if (e == NULL) continue;
-        if (!cerca(b, px, pz, RADIO_GRANDE)) continue;
-        dibujar_bloque(b, e);
+        int c = (int)floorf(b->x / CIUDAD_TAM + ancho * 0.5f) / GCH;
+        int f = (int)floorf(b->z / CIUDAD_TAM + alto * 0.5f) / GCH;
+        if (c != gc || f != gf) continue;
+        armar_fachada(&g->m, b, e);
     }
     for (int i = 0; i < n_arboles; i++) {
-        if (fabsf(arboles[i][0] - px) > RADIO_ARBOL || fabsf(arboles[i][1] - pz) > RADIO_ARBOL) continue;
-        dibujar_arbol(arboles[i][0], arboles[i][1]);
+        float x = arboles[i][0], z = arboles[i][1];
+        int c = (int)floorf(x / CIUDAD_TAM + ancho * 0.5f) / GCH;
+        int f = (int)floorf(z / CIUDAD_TAM + alto * 0.5f) / GCH;
+        if (c != gc || f != gf) continue;
+        unsigned q = azar2((int)(x * 4), (int)(z * 4));
+        float esc = 0.9f + (q % 5) * 0.05f;
+        malla_agregar(&g->m, &arbol_malla[(q >> 6) % 3], x, 0.0f, z, esc, (float)((q >> 3) % 4) * 90.0f);
+    }
+    malla_subir(&g->m);
+    g->listo = 1;
+}
+
+static void centro_grupo(int gc, int gf, float *cx, float *cz) {
+    *cx = ((gc + 0.5f) * GCH - ancho * 0.5f) * CIUDAD_TAM;
+    *cz = ((gf + 0.5f) * GCH - alto * 0.5f) * CIUDAD_TAM;
+}
+
+// Arma de antemano todo lo que está cerca (se usa al empezar, para que no haya tirones)
+void ciudad_precalentar(float px, float pz) {
+    int nc = (ancho + GCH - 1) / GCH, nf = (alto + GCH - 1) / GCH;
+    if (nc > MAX_G) nc = MAX_G;
+    if (nf > MAX_G) nf = MAX_G;
+    for (int gf = 0; gf < nf; gf++)
+        for (int gc = 0; gc < nc; gc++) {
+            float cx, cz; centro_grupo(gc, gf, &cx, &cz);
+            if (fmaxf(fabsf(cx - px), fabsf(cz - pz)) - GCH * 0.5f > RADIO_GRANDE) continue;
+            if (!grupos[gf][gc].listo) armar_grupo(gc, gf);
+        }
+}
+
+void ciudad_dibujar(float px, float pz, float giro) {
+    bakes_restantes = BAKES_POR_CUADRO;
+    float rad = giro * 3.14159265f / 180.0f, fx = sinf(rad), fz = -cosf(rad);
+    int nc = (ancho + GCH - 1) / GCH, nf = (alto + GCH - 1) / GCH;
+    if (nc > MAX_G) nc = MAX_G;
+    if (nf > MAX_G) nf = MAX_G;
+    for (int gf = 0; gf < nf; gf++) {
+        for (int gc = 0; gc < nc; gc++) {
+            Grupo *g = &grupos[gf][gc];
+            float cx, cz; centro_grupo(gc, gf, &cx, &cz);
+            float d = fmaxf(fabsf(cx - px), fabsf(cz - pz)) - GCH * 0.5f;
+            if (d > RADIO_BORRA) { if (g->listo) { malla_liberar(&g->m); g->listo = 0; } continue; }
+            if (d > RADIO_GRANDE) continue;
+            // detrás de la cámara no hay nada que ver
+            if ((cx - px) * fx + (cz - pz) * fz < -GCH * 0.8f - 16.0f) continue;
+            if (!g->listo) {
+                if (bakes_restantes <= 0) continue;
+                bakes_restantes--;
+                armar_grupo(gc, gf);
+            }
+            malla_dibujar(&g->m);
+        }
     }
     lugares_dibujar(px, pz);
 }

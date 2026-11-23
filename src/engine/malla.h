@@ -8,6 +8,8 @@ typedef struct {
     float *pos;            // x,y,z de cada punto
     unsigned char *col;    // r,g,b,a de cada punto
     int n, cap;            // puntos usados y espacio reservado
+    int gpu;               // 1 si ya está guardada en la memoria de video (más rápido de dibujar)
+    unsigned int vbo[2];   // buffers de la memoria de video (posiciones y colores)
 } Malla;
 
 void malla_iniciar(Malla *m);
@@ -24,6 +26,13 @@ void malla_caja(Malla *m, float x, float y, float z, float sx, float sy, float s
 // Solo un rectángulo plano horizontal a altura y.
 void malla_tapa(Malla *m, float x, float y, float z, float sx, float sz,
                 float r, float g, float bl);
+
+// Pasa la malla a la memoria de video y borra la copia de la memoria normal.
+// Después de esto la malla se dibuja MUCHO más rápido, pero ya no se le pueden agregar caras.
+void malla_subir(Malla *m);
+
+// Copia "origen" dentro de "destino" (movida a dx,dy,dz, escalada y girada alrededor de Y).
+void malla_agregar(Malla *destino, const Malla *origen, float dx, float dy, float dz, float escala, float giro_grados);
 
 void malla_dibujar(const Malla *m);
 

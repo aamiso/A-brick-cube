@@ -33,6 +33,7 @@ void personaje_crear(Personaje *p, unsigned camisa, unsigned pantalon, unsigned 
     voxel_poner(&v, 2, 1, 5, 'm'); voxel_poner(&v, 3, 1, 5, 'm');   // boca
     malla_iniciar(&p->cabeza);
     voxel_malla(&v, LADO, 3.0f, 0.0f, 3.0f, &p->cabeza);
+    malla_subir(&p->cabeza);
     voxel_liberar(&v);
 
     // Torso 8 x 6 x 4
@@ -42,6 +43,7 @@ void personaje_crear(Personaje *p, unsigned camisa, unsigned pantalon, unsigned 
     voxel_caja(&v, 3, 5, 3, 2, 1, 1, 'p');           // cuello en V
     malla_iniciar(&p->torso);
     voxel_malla(&v, LADO, 4.0f, 0.0f, 2.0f, &p->torso);
+    malla_subir(&p->torso);
     voxel_liberar(&v);
 
     // Brazo 2 x 6 x 2 (el pivote es el hombro, arriba)
@@ -50,6 +52,7 @@ void personaje_crear(Personaje *p, unsigned camisa, unsigned pantalon, unsigned 
     voxel_caja(&v, 0, 0, 0, 2, 2, 2, 'p');
     malla_iniciar(&p->brazo);
     voxel_malla(&v, LADO, 1.0f, 6.0f, 1.0f, &p->brazo);
+    malla_subir(&p->brazo);
     voxel_liberar(&v);
 
     // Pierna 3 x 6 x 3 (el pivote es la cadera, arriba)
@@ -58,6 +61,7 @@ void personaje_crear(Personaje *p, unsigned camisa, unsigned pantalon, unsigned 
     voxel_caja(&v, 0, 0, 0, 3, 1, 3, 'k');
     malla_iniciar(&p->pierna);
     voxel_malla(&v, LADO, 1.5f, 6.0f, 1.5f, &p->pierna);
+    malla_subir(&p->pierna);
     voxel_liberar(&v);
 
     p->listo = 1;

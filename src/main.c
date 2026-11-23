@@ -30,6 +30,7 @@ int main(void) {
     Camara camara;
     jugador_iniciar(&jugador);
     ciudad_inicio(&jugador.x, &jugador.z); // empieza donde dice la P del mapa
+    ciudad_precalentar(jugador.x, jugador.z);
     camara_iniciar(&camara);
 
     while (1) {
@@ -62,7 +63,7 @@ int main(void) {
         terreno_dibujar(jugador.x, jugador.z, camara.giro);   // detalle de cerca: rayas, bordillos, cebras
         // 2) Lo que tiene volumen, con profundidad.
         glEnable(GL_DEPTH_TEST);
-        ciudad_dibujar(jugador.x, jugador.z);   // edificios, árboles y lugares con modelo
+        ciudad_dibujar(jugador.x, jugador.z, camara.giro);   // edificios, árboles y lugares con modelo
         frontera_dibujar(jugador.x, jugador.z);
         jugador_dibujar(&jugador);
         cubo_desactivar();

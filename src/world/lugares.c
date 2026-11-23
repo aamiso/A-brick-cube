@@ -10,7 +10,7 @@
 
 #define LADO        0.5f     // cuánto mide cada cubito en el mundo (media celda)
 #define MAX_LUGARES 1500
-#define RADIO_MODELO 70.0f   // hasta dónde se dibuja el modelo completo
+#define RADIO_MODELO 72.0f   // hasta dónde se dibuja el modelo completo
 #define RADIO_CAJA   115.0f  // más lejos se dibuja una cajita simple
 #define CAPA_PARED   2       // capa donde se mira si hay pared (choque)
 
@@ -65,6 +65,7 @@ void lugares_cargar_modelos(void) {
         // La capa 0 es el suelo: su parte de arriba queda justo a la altura 0
         malla_iniciar(&t->malla);
         voxel_malla(vx, 1.0f, vx->W * 0.5f, 1.0f, vx->D * 0.5f, &t->malla);
+        malla_subir(&t->malla);
 
         t->solido = (unsigned char *)calloc((size_t)vx->W * vx->D, 1);
         t->altura = (float *)calloc((size_t)vx->W * vx->D, sizeof(float));
@@ -114,9 +115,6 @@ void lugares_dibujar(float px, float pz) {
                 glScalef(LADO, LADO, LADO);
                 malla_dibujar(&t->malla);
                 glPopMatrix();
-            } else if (dx < RADIO_CAJA + mx && dz < RADIO_CAJA + mz) {
-                float h = t->alto_max > 2.0f ? t->alto_max : 2.0f;
-                caja(l->x, h * 0.5f, l->z, l->w * 0.6f, h, l->d * 0.6f, t->r, t->g, t->b);
             }
         } else if (dx < RADIO_CAJA + mx && dz < RADIO_CAJA + mz) {
             // No se encontró el modelo: una cajita de color para no dejar un hueco

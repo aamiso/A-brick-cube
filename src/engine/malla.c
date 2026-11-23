@@ -2,10 +2,13 @@
 #include "engine/cubo.h"
 #include <vitaGL.h>
 #include <stdlib.h>
+#include <string.h>
+#include <math.h>
 
-void malla_iniciar(Malla *m) { m->pos = NULL; m->col = NULL; m->n = m->cap = 0; }
+void malla_iniciar(Malla *m) { m->pos = NULL; m->col = NULL; m->n = m->cap = 0; m->gpu = 0; m->vbo[0] = m->vbo[1] = 0; }
 
 void malla_liberar(Malla *m) {
+    if (m->gpu) glDeleteBuffers(2, m->vbo);
     free(m->pos); free(m->col);
     malla_iniciar(m);
 }
@@ -76,11 +79,47 @@ void malla_caja(Malla *m, float x, float y, float z, float sx, float sy, float s
     malla_quad(m, A, B, C, D, r * BRILLO_IZQ, g * BRILLO_IZQ, bl * BRILLO_IZQ);
 }
 
+void malla_subir(Malla *m) {
+    if (m->gpu || m->n <= 0) return;
+    glGenBuffers(2, m->vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, m->vbo[0]);
+    glBufferData(GL_ARRAY_BUFFER, (long)m->n * 3 * (long)sizeof(float), m->pos, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, m->vbo[1]);
+    glBufferData(GL_ARRAY_BUFFER, (long)m->n * 4, m->col, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    free(m->pos); free(m->col);
+    m->pos = NULL; m->col = NULL; m->cap = 0;
+    m->gpu = 1;
+}
+
+void malla_agregar(Malla *d, const Malla *o, float dx, float dy, float dz, float escala, float giro_grados) {
+    if (o->gpu || o->n <= 0 || !reservar(d, o->n)) return;
+    float a = giro_grados * 3.14159265f / 180.0f, c = cosf(a), s = sinf(a);
+    for (int i = 0; i < o->n; i++) {
+        const float *p = o->pos + i * 3;
+        float x = p[0] * escala, y = p[1] * escala, z = p[2] * escala;
+        float *q = d->pos + d->n * 3;
+        q[0] = x * c + z * s + dx;
+        q[1] = y + dy;
+        q[2] = -x * s + z * c + dz;
+        memcpy(d->col + d->n * 4, o->col + i * 4, 4);
+        d->n++;
+    }
+}
+
 void malla_dibujar(const Malla *m) {
     if (m->n <= 0) return;
     glEnableClientState(GL_COLOR_ARRAY);
-    glVertexPointer(3, GL_FLOAT, 0, m->pos);
-    glColorPointer(4, GL_UNSIGNED_BYTE, 0, m->col);
+    if (m->gpu) {
+        glBindBuffer(GL_ARRAY_BUFFER, m->vbo[0]);
+        glVertexPointer(3, GL_FLOAT, 0, (const void *)0);
+        glBindBuffer(GL_ARRAY_BUFFER, m->vbo[1]);
+        glColorPointer(4, GL_UNSIGNED_BYTE, 0, (const void *)0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    } else {
+        glVertexPointer(3, GL_FLOAT, 0, m->pos);
+        glColorPointer(4, GL_UNSIGNED_BYTE, 0, m->col);
+    }
     glDrawArrays(GL_TRIANGLES, 0, m->n);
     glDisableClientState(GL_COLOR_ARRAY);
     cubo_activar(); // vuelve a dejar listo el cubo para caja() y baldosa()

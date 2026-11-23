@@ -18,8 +18,11 @@ void ciudad_inicio(float *x, float *z);
 // Dibuja lo que va PEGADO al suelo (agua, calles, aceras). Se llama con la profundidad apagada.
 void ciudad_dibujar_suelo(float px, float pz);
 
-// Dibuja lo que tiene volumen (casas, edificios, árboles). Solo lo que está cerca del jugador.
-void ciudad_dibujar(float px, float pz);
+// Dibuja lo que tiene volumen (casas, edificios, árboles). giro = hacia dónde mira la cámara.
+void ciudad_dibujar(float px, float pz, float giro);
+
+// Arma de antemano lo que rodea al jugador (para que no haya tirones al empezar)
+void ciudad_precalentar(float px, float pz);
 
 // 1 si un círculo en (x, z) con ese radio toca un edificio, árbol o agua.
 int ciudad_choca(float x, float z, float radio);

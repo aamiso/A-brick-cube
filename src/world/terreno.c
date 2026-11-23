@@ -117,6 +117,7 @@ static void armar_pedazo(int pc, int pf) {
     if (f1 > ciudad_alto())  f1 = ciudad_alto();
     for (int f = f0; f < f1; f++) for (int c = c0; c < c1; c++) celda_base(m, c, f);
     for (int f = f0; f < f1; f++) for (int c = c0; c < c1; c++) celda_detalle(m, c, f);
+    malla_subir(m);
     armado[pf][pc] = 1;
 }
 
