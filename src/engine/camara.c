@@ -3,10 +3,9 @@
 #include <vitaGL.h>
 #include <math.h>
 
-#define ALTO_MIN 5.0f
+#define ALTO_MIN 14.0f
 #define ALTO_MAX 70.0f
 #define DIST_MIN 1.6f
-#define ALTO_AUTO_MAX 85.0f   // si hay una pared pegada, la cámara puede subir casi hasta arriba del jugador
 #define PI_ 3.14159265f
 
 void camara_iniciar(Camara *c) {
@@ -49,31 +48,32 @@ static float alcance(float px, float pz, float alto, float giro, float dist) {
     return dist;
 }
 
+// Hasta dónde llega la cámara sin tocar nada (afina el punto exacto)
+static float libre_hasta(float px, float pz, float alto, float giro, float dist) {
+    float a = alto * PI_ / 180.0f, g = giro * PI_ / 180.0f;
+    float dx = -cosf(a) * sinf(g), dy = sinf(a), dz = cosf(a) * cosf(g);
+    float ok = 0.0f, mal = -1.0f;
+    for (int k = 1; k <= 40; k++) {
+        float t = dist * k / 40.0f;
+        if (bloqueado(px + dx * t, 1.0f + dy * t, pz + dz * t, t >= 2.5f)) { mal = t; break; }
+        ok = t;
+    }
+    if (mal < 0.0f) return dist;
+    for (int i = 0; i < 4; i++) {
+        float t = (ok + mal) * 0.5f;
+        if (bloqueado(px + dx * t, 1.0f + dy * t, pz + dz * t, t >= 2.5f)) mal = t; else ok = t;
+    }
+    return ok - 0.15f;
+}
+
 void camara_aplicar(Camara *c, float px, float pz) {
-    // 1) Busca la inclinación más baja (desde la que elige el jugador) con el camino libre
-    float objetivo = c->alto, mejor_alcance = -1.0f, mejor_alto = c->alto;
-    int libre = 0;
-    for (float ang = c->alto; ang <= ALTO_AUTO_MAX + 0.01f; ang += 4.0f) {
-        float t = alcance(px, pz, ang, c->giro, c->distancia);
-        if (t >= c->distancia - 0.01f) { objetivo = ang; libre = 1; break; }
-        if (t >= mejor_alcance) { mejor_alcance = t; mejor_alto = ang; }
-    }
-    if (!libre) objetivo = mejor_alto;
-
-    // 2) Sube de golpe si hace falta; baja despacio (se siente suave)
-    float usar = objetivo;
-    if (objetivo < c->alto_real) {
-        usar = c->alto_real + (objetivo - c->alto_real) * 0.10f;
-        if (alcance(px, pz, usar, c->giro, c->distancia) < alcance(px, pz, objetivo, c->giro, c->distancia) - 0.01f)
-            usar = objetivo;
-    }
-    c->alto_real = usar;
-
-    // 3) Si aun así no cabe, se acerca
-    float meta = alcance(px, pz, usar, c->giro, c->distancia);
+    // La inclinación NO cambia: si algo estorba, la cámara solo se acerca al jugador.
+    c->alto_real = c->alto;
+    float meta = libre_hasta(px, pz, c->alto, c->giro, c->distancia);
     if (meta < DIST_MIN) meta = DIST_MIN;
-    if (meta < c->real) c->real = meta;
-    else                c->real = c->real + (meta - c->real) * 0.08f;
+    // Suave en los dos sentidos (así no da tirones): se acerca rápido y se aleja despacio
+    float k = (meta < c->real) ? 0.60f : 0.05f;
+    c->real += (meta - c->real) * k;
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();

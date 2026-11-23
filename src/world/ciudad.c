@@ -2,6 +2,7 @@
 #include "world/lugares.h"
 #include "engine/cubo.h"
 #include "engine/malla.h"
+#include "engine/voxel.h"
 #include <vitaGL.h>
 #include <math.h>
 #include <stdio.h>
@@ -33,7 +34,7 @@
 #define MAX_BLOQUES 40000
 #define MAX_ARBOLES 20000
 
-#define RADIO_GRANDE  72.0f   // hasta dónde se dibujan edificios y calles lejanas
+#define RADIO_GRANDE  64.0f   // hasta dónde se dibujan edificios y calles lejanas
 #define RADIO_BORRA   120.0f  // los grupos más lejos que esto se borran de la memoria
 #define BAKES_POR_CUADRO 1    // cuántos grupos nuevos se arman por cuadro (para no trabarse)
 
@@ -343,75 +344,122 @@ void ciudad_dibujar_suelo(float px, float pz) {
 
 // ---------- Edificios con ventanas ----------
 
-static void ventana(Malla *m, int lado, float u, float y0, float y1, float w, float fijo,
-                    float r, float g, float b) {
-    float a[3], bb[3], c[3], d[3], br;
-    switch (lado) {
-        case 0:  // frente (+z): u = x
-            a[0]=u;     a[1]=y0; a[2]=fijo; bb[0]=u+w; bb[1]=y0; bb[2]=fijo;
-            c[0]=u+w;   c[1]=y1; c[2]=fijo; d[0]=u;    d[1]=y1; d[2]=fijo; br = BRILLO_FRENTE; break;
-        case 1:  // atrás (-z)
-            a[0]=u;     a[1]=y0; a[2]=fijo; bb[0]=u+w; bb[1]=y0; bb[2]=fijo;
-            c[0]=u+w;   c[1]=y1; c[2]=fijo; d[0]=u;    d[1]=y1; d[2]=fijo; br = BRILLO_ATRAS; break;
-        case 2:  // derecha (+x): u = z
-            a[0]=fijo;  a[1]=y0; a[2]=u;    bb[0]=fijo; bb[1]=y0; bb[2]=u+w;
-            c[0]=fijo;  c[1]=y1; c[2]=u+w;  d[0]=fijo;  d[1]=y1; d[2]=u;    br = BRILLO_DER; break;
-        default: // izquierda (-x)
-            a[0]=fijo;  a[1]=y0; a[2]=u;    bb[0]=fijo; bb[1]=y0; bb[2]=u+w;
-            c[0]=fijo;  c[1]=y1; c[2]=u+w;  d[0]=fijo;  d[1]=y1; d[2]=u;    br = BRILLO_IZQ; break;
-    }
-    malla_quad(m, a, bb, c, d, r * br, g * br, b * br);
+// ---------- Edificios hechos de cubitos (voxels) ----------
+
+static unsigned int rgb_de(float r, float g, float b) {
+    if (r > 1) r = 1; if (g > 1) g = 1; if (b > 1) b = 1;
+    return ((unsigned)(r * 255) << 16) | ((unsigned)(g * 255) << 8) | (unsigned)(b * 255);
+}
+
+// ¿Es una cara exterior (hacia los lados)? devuelve 1..4 según el lado, 0 si no
+static int cara_lado(const Voxeles *v, int x, int y, int z) {
+    if (!voxel_hay(v, x, y, z + 1)) return 1;   // +z (frente)
+    if (!voxel_hay(v, x, y, z - 1)) return 2;
+    if (!voxel_hay(v, x + 1, y, z)) return 3;
+    if (!voxel_hay(v, x - 1, y, z)) return 4;
+    return 0;
 }
 
 static void armar_fachada(Malla *m, const Bloque *b, const TipoEdificio *e) {
-    float h = e->h;
+    float lado = (e->h >= 14.0f) ? 1.0f : 0.5f;
     int vidrio = (e->letra == 'E');
-    float ww = vidrio ? 1.6f : 1.0f, hueco = vidrio ? 0.4f : 1.0f;
-
-    // cuerpo, base oscura y tapa del techo
-    malla_caja(m, b->x, h * 0.5f, b->z, b->w, h, b->d, e->r, e->g, e->b);
-    if (h >= 10.0f)
-        malla_caja(m, b->x, 0.7f, b->z, b->w + 0.2f, 1.4f, b->d + 0.2f, e->r * 0.45f, e->g * 0.45f, e->b * 0.45f);
-    if (b->w > 2.0f && b->d > 2.0f)
-        malla_caja(m, b->x, h + 0.25f, b->z, b->w - 0.6f, 0.5f, b->d - 0.6f, e->r * 0.75f, e->g * 0.75f, e->b * 0.75f);
-    // cosas en el techo
-    if (b->w >= 6.0f && b->d >= 6.0f) {
-        unsigned q = azar2((int)(b->x * 10), (int)(b->z * 10));
-        malla_caja(m, b->x - b->w * 0.2f + (q % 3) * 0.3f, h + 0.9f, b->z - b->d * 0.2f, 1.6f, 0.8f, 1.6f, 0.55f, 0.58f, 0.62f);
-        if (q & 4) malla_caja(m, b->x + b->w * 0.2f, h + 0.8f, b->z + b->d * 0.15f, 1.2f, 0.6f, 2.0f, 0.55f, 0.58f, 0.62f);
+    int nx, nz, ny;
+    for (;;) {
+        nx = (int)(b->w / lado); nz = (int)(b->d / lado); ny = (int)(e->h / lado);
+        if (nx < 2) nx = 2;
+        if (nz < 2) nz = 2;
+        if (nx <= 100 && nz <= 100) break;
+        lado *= 2.0f;
     }
-    if (h >= 22.0f) malla_caja(m, b->x, h + 1.8f, b->z, 0.35f, 3.2f, 0.35f, 0.8f, 0.1f, 0.1f);
+    const int M = 2, EXTRA = 8;
+    Voxeles v;
+    voxel_crear(&v, nx + 2 * M, nz + 2 * M, ny + EXTRA);
+    voxel_color(&v, 'c', rgb_de(e->r, e->g, e->b));
+    voxel_color(&v, 't', rgb_de(e->r * 1.15f + 0.05f, e->g * 1.15f + 0.05f, e->b * 1.15f + 0.05f));
+    voxel_color(&v, 'd', rgb_de(e->r * 0.45f, e->g * 0.45f, e->b * 0.45f));
+    voxel_color(&v, 'r', rgb_de(e->r * 0.7f, e->g * 0.7f, e->b * 0.7f));
+    voxel_color(&v, 'w', vidrio ? 0x7fd0ec : 0x34506a);
+    voxel_color(&v, 'y', vidrio ? 0xb4ecfa : 0xfadc80);
+    voxel_color(&v, 'a', 0x8c949e);
+    voxel_color(&v, 'p', 0x52331f);
+    voxel_color(&v, 'n', 0xd13a32);
+    voxel_color(&v, 'k', 0xe02020);
 
-    // ventanas en las 4 caras
-    for (int lado = 0; lado < 4; lado++) {
-        int horiz = (lado < 2);
-        float largo = horiz ? b->w : b->d;
-        float centro = horiz ? b->x : b->z;
-        float fijo = (lado == 0) ? b->z + b->d * 0.5f + 0.02f :
-                     (lado == 1) ? b->z - b->d * 0.5f - 0.02f :
-                     (lado == 2) ? b->x + b->w * 0.5f + 0.02f : b->x - b->w * 0.5f - 0.02f;
-        int n = (int)floorf((largo - 1.0f + hueco) / (ww + hueco));
-        if (n < 1) continue;
-        float total = n * ww + (n - 1) * hueco;
-        float u0 = centro - total * 0.5f;
-        int nivel = 0;
-        for (float y = 1.9f; y + 1.2f <= h - 0.6f; y += 2.2f, nivel++) {
-            for (int k = 0; k < n; k++) {
-                // la puerta ocupa el hueco del medio en la planta baja del frente
-                unsigned q = azar2(lado * 131 + k * 17 + (int)(b->x * 3), nivel * 29 + (int)(b->z * 3));
-                float r = 0.20f, g = 0.30f, bl = 0.40f;
-                if (vidrio) { r = 0.50f; g = 0.82f; bl = 0.92f; if (q % 5 == 0) { r = 0.70f; g = 0.92f; bl = 0.98f; } }
-                else if (q % 6 == 0) { r = 0.98f; g = 0.86f; bl = 0.50f; }
-                ventana(m, lado, u0 + k * (ww + hueco), y, y + 1.2f, ww, fijo, r, g, bl);
+    int fino = (lado < 1.0f);
+    int base = fino ? 2 : 1;                          // alto de la base oscura
+    int pisos_t = (e->h >= 18.0f) ? (ny * 7 / 10) : ny; // los edificios altos se angostan arriba
+    int ins = (nx > 8 && nz > 8) ? (nx / 6 > 3 ? 3 : nx / 6) : 0;
+    // cuerpo
+    voxel_caja(&v, M, 0, M, nx, pisos_t, nz, 'c');
+    int top_y = pisos_t, top_x = M, top_z = M, top_w = nx, top_d = nz;
+    if (pisos_t < ny && ins > 0) {
+        voxel_caja(&v, M + ins, pisos_t, M + ins, nx - 2 * ins, ny - pisos_t, nz - 2 * ins, 'c');
+        top_x = M + ins; top_z = M + ins; top_w = nx - 2 * ins; top_d = nz - 2 * ins; top_y = ny;
+    } else if (pisos_t < ny) {
+        voxel_caja(&v, M, pisos_t, M, nx, ny - pisos_t, nz, 'c');
+        top_y = ny;
+    }
+    // cornisa a mitad (da la forma escalonada)
+    if (pisos_t < ny && ins > 0)
+        voxel_caja(&v, M - 1 + 0, pisos_t - 1, M - 1, nx + 2, 1, nz + 2, 't');
+
+    // ventanas: se recorre cada cubito de pared
+    for (int y = base; y < top_y - 1; y++)
+        for (int z = 0; z < v.D; z++)
+            for (int x = 0; x < v.W; x++) {
+                if (!voxel_hay(&v, x, y, z) || v.v[((size_t)y * v.D + z) * v.W + x] != 'c') continue;
+                int c = cara_lado(&v, x, y, z);
+                if (!c) continue;
+                int u = (c <= 2) ? x : z;
+                int u0 = (c <= 2) ? M : M;
+                int uu = u - u0;
+                int largo = (c <= 2) ? nx : nz;
+                if (uu < 1 || uu > largo - 2) continue;      // no en las esquinas
+                if (uu < 0) continue;
+                int col, fila;
+                if (vidrio) { col = (uu % 4) != 0; fila = (y % 3) != 0; }
+                else if (fino) { col = (uu % 3) != 0; fila = (y % 4) >= 2; }
+                else { col = (uu % 2) == 1; fila = (y % 2) == 1; }
+                if (!col || !fila) continue;
+                unsigned q = azar2(x * 131 + z * 17 + (int)(b->x * 3), y * 29 + c + (int)(b->z * 3));
+                char w = (q % 6 == 0) ? 'y' : 'w';
+                voxel_poner(&v, x, y, z, w);
             }
+    // base oscura (planta baja)
+    for (int y = 0; y < base; y++)
+        for (int z = M; z < M + nz; z++)
+            for (int x = M; x < M + nx; x++)
+                if (cara_lado(&v, x, y, z)) voxel_poner(&v, x, y, z, 'd');
+    // techo con borde
+    int tx0 = top_x, tz0 = top_z;
+    for (int x = tx0; x < tx0 + top_w; x++)
+        for (int z = tz0; z < tz0 + top_d; z++) {
+            int borde = (x == tx0 || z == tz0 || x == tx0 + top_w - 1 || z == tz0 + top_d - 1);
+            voxel_poner(&v, x, top_y - 1, z, borde ? 't' : 'r');
+            if (borde) voxel_poner(&v, x, top_y, z, 't');
         }
+    // cosas en el techo
+    if (top_w >= 6 && top_d >= 6) {
+        unsigned q = azar2((int)(b->x * 10), (int)(b->z * 10));
+        int bw = fino ? 3 : 2;
+        voxel_caja(&v, tx0 + 2 + (q % 2), top_y, tz0 + 2, bw, 2, bw, 'a');
+        if (q & 4) voxel_caja(&v, tx0 + top_w - 2 - bw, top_y, tz0 + top_d / 2, bw, 1, bw + 1, 'a');
     }
-    // puerta y toldito en el frente (+z)
-    if (b->w >= 4.0f) {
-        float zf = b->z + b->d * 0.5f;
-        ventana(m, 0, b->x - 0.6f, 0.0f, 1.9f, 1.2f, zf + 0.03f, 0.32f, 0.20f, 0.12f);
-        malla_caja(m, b->x, 2.15f, zf + 0.4f, 2.4f, 0.18f, 0.8f, 0.82f, 0.22f, 0.20f);
+    if (e->h >= 22.0f) voxel_caja(&v, tx0 + top_w / 2, top_y, tz0 + top_d / 2, 1, EXTRA - 1, 1, 'k');
+    // puerta y toldo en el frente (+z)
+    if (nx >= 4) {
+        int dw = fino ? 3 : 2, dh = fino ? 4 : 2;
+        int dx = M + nx / 2 - dw / 2, zf = M + nz - 1;
+        voxel_caja(&v, dx, 0, zf, dw, dh, 1, 'p');
+        voxel_caja(&v, dx - 1, dh, zf + 1, dw + 2, 1, 1, 'n');
     }
+
+    Malla tmp;
+    malla_iniciar(&tmp);
+    voxel_malla(&v, lado, v.W * 0.5f, 0.0f, v.D * 0.5f, &tmp);
+    malla_agregar(m, &tmp, b->x, 0.0f, b->z, 1.0f, 0.0f);
+    malla_liberar(&tmp);
+    voxel_liberar(&v);
 }
 
 static void armar_grupo(int gc, int gf) {

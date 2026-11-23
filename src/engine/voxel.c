@@ -4,8 +4,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#define MAX_LADO 64
-#define MAX_ALTO 64
+#define MAX_LADO 128
+#define MAX_ALTO 128
 
 static int hex1(char c) {
     if (c >= '0' && c <= '9') return c - '0';
