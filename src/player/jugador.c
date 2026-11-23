@@ -16,10 +16,12 @@ void jugador_iniciar(Jugador *j) {
     j->vel = 0.0f;
     j->fase = 0.0f;
     j->tiempo = 0.0f;
+    j->elev = 0.0f;
+    j->vy = 0.0f;
     if (!personaje.listo) personaje_crear(&personaje, 0xd9382c, 0x2f62c9, 0xf2c230, 0x5a3a22);
 }
 
-void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara) {
+void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara, int correr, int saltar) {
     j->tiempo += 1.0f / 60.0f;
 
     float rad = giro_camara * PI / 180.0f;
@@ -33,9 +35,10 @@ void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara) {
 
     if (fuerza > 0.01f) {
         if (fuerza > 1.0f) { dx /= fuerza; dz /= fuerza; fuerza = 1.0f; }
-        objetivo = fuerza;
+        float turbo = correr ? 1.7f : 1.0f;
+        objetivo = fuerza * turbo;
         // Se mueve en X y en Z por separado: si choca de frente, todavía se desliza por la pared.
-        float paso_x = dx * 0.15f, paso_z = dz * 0.15f;
+        float paso_x = dx * 0.15f * turbo, paso_z = dz * 0.15f * turbo;
         if (!ciudad_choca(j->x + paso_x, j->z, RADIO)) j->x += paso_x;
         if (!ciudad_choca(j->x, j->z + paso_z, RADIO)) j->z += paso_z;
 
@@ -45,15 +48,21 @@ void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara) {
         while (dif > 180.0f) dif -= 360.0f;
         while (dif < -180.0f) dif += 360.0f;
         j->angulo += dif * 0.30f;
-        j->fase += 0.30f * fuerza;
+        j->fase += 0.30f * fuerza * (correr ? 1.4f : 1.0f);
+    }
+    // Salto
+    if (saltar && j->elev <= 0.001f) j->vy = 0.17f;
+    if (j->elev > 0.0f || j->vy > 0.0f) {
+        j->elev += j->vy; j->vy -= 0.012f;
+        if (j->elev <= 0.0f) { j->elev = 0.0f; j->vy = 0.0f; }
     }
     // La velocidad sube y baja poco a poco (así no se ve brusco)
-    j->vel += (objetivo - j->vel) * 0.20f;
+    j->vel += (objetivo - j->vel) * 0.15f;
     if (objetivo == 0.0f && j->vel < 0.02f) { j->vel = 0.0f; j->fase = 0.0f; }
 
     suelo_limitar(&j->x, &j->z);
 }
 
 void jugador_dibujar(const Jugador *j) {
-    personaje_dibujar(&personaje, j->x, j->z, j->angulo, j->vel, j->fase, j->tiempo);
+    personaje_dibujar(&personaje, j->x, j->z, j->angulo, j->vel, j->fase, j->tiempo, j->elev);
 }

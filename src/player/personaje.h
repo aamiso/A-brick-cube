@@ -15,10 +15,10 @@ void personaje_crear(Personaje *p, unsigned camisa, unsigned pantalon, unsigned 
 void personaje_liberar(Personaje *p);
 
 // Dibuja al personaje en (x, z) mirando a "angulo" grados.
-//   vel   = 0 parado ... 1 corriendo (mezcla entre reposo y caminar)
+//   vel   = 0 parado ... 1 caminando ... 1.7 corriendo; elev = altura del salto (mezcla entre reposo y caminar)
 //   fase  = avanza al caminar (mueve piernas y brazos)
 //   tiempo = segundos para la respiración y mirar alrededor en reposo
 void personaje_dibujar(const Personaje *p, float x, float z, float angulo,
-                       float vel, float fase, float tiempo);
+                       float vel, float fase, float tiempo, float elev);
 
 #endif

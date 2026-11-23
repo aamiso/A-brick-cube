@@ -15,7 +15,7 @@ include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 # Nombre y datos del juego en la Vita
 set(VITA_APP_NAME "A Brick Cube")
 set(VITA_TITLEID  "ABCV00001")
-set(VITA_VERSION  "00.52")
+set(VITA_VERSION  "00.53")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-q -O2 -std=gnu99")
 

@@ -8,13 +8,15 @@ typedef struct {
     float vel;      // 0 parado ... 1 a toda velocidad (suavizado)
     float fase;     // avanza al caminar (mueve piernas y brazos)
     float tiempo;   // segundos desde que empezó (respiración, mirar alrededor)
+    float elev, vy; // altura del salto y velocidad vertical
 } Jugador;
 
 void jugador_iniciar(Jugador *j);
 
 // Lo mueve según el stick izquierdo (lx, ly van de -1 a 1).
 // "giro_camara" son los grados de la cámara: se camina relativo a lo que ves.
-void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara);
+// correr = 1 mientras corre; saltar = 1 en el cuadro en que se aprieta saltar.
+void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara, int correr, int saltar);
 
 void jugador_dibujar(const Jugador *j);
 

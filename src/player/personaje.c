@@ -74,26 +74,32 @@ void personaje_liberar(Personaje *p) {
 }
 
 void personaje_dibujar(const Personaje *p, float x, float z, float angulo,
-                       float vel, float fase, float tiempo) {
+                       float vel, float fase, float tiempo, float elev) {
     if (!p->listo) return;
-    float quieto = 1.0f - vel;
+    float correr = vel > 1.0f ? (vel - 1.0f) / 0.7f : 0.0f;
+    if (correr > 1.0f) correr = 1.0f;
+    if (vel > 1.0f) vel = 1.0f;
+    float aire = elev > 0.03f ? 1.0f : 0.0f;
+    float quieto = (1.0f - vel) * (1.0f - aire);
     float paso = sinf(fase);
-    float balanceo = paso * 48.0f * vel;                         // piernas y brazos al caminar
-    float rebote = fabsf(paso) * 0.07f * vel;                    // sube y baja al caminar
+    float balanceo = paso * (48.0f + 24.0f * correr) * vel * (1.0f - aire * 0.7f);                         // piernas y brazos al caminar
+    float rebote = fabsf(paso) * (0.07f + 0.06f * correr) * vel * (1.0f - aire) + elev;                    // sube y baja al caminar
     float respira = sinf(tiempo * 2.2f) * 0.012f * quieto;       // respiración
-    float inclina = 5.0f * vel;                                  // se inclina hacia adelante
+    float inclina = (5.0f + 11.0f * correr) * vel + aire * 8.0f;                                  // se inclina hacia adelante
     float giro_torso = paso * 7.0f * vel;                        // caderas
     float mira = sinf(tiempo * 0.6f) * 14.0f * quieto;           // mira alrededor en reposo
     float abre = 4.0f + sinf(tiempo * 2.2f) * 1.5f * quieto;     // brazos un poco separados
 
+    float brazos_arriba = aire * 150.0f;
+    float piernas_aire = aire * 28.0f;
     glPushMatrix();
     glTranslatef(x, rebote + respira, z);
     glRotatef(angulo, 0.0f, 1.0f, 0.0f);
 
     // Piernas
-    glPushMatrix(); glTranslatef(-0.17f, 0.6f, 0.0f); glRotatef(balanceo, 1.0f, 0.0f, 0.0f);
+    glPushMatrix(); glTranslatef(-0.17f, 0.6f, 0.0f); glRotatef(balanceo + piernas_aire, 1.0f, 0.0f, 0.0f);
     malla_dibujar(&p->pierna); glPopMatrix();
-    glPushMatrix(); glTranslatef(0.17f, 0.6f, 0.0f); glRotatef(-balanceo, 1.0f, 0.0f, 0.0f);
+    glPushMatrix(); glTranslatef(0.17f, 0.6f, 0.0f); glRotatef(-balanceo - piernas_aire * 0.5f, 1.0f, 0.0f, 0.0f);
     malla_dibujar(&p->pierna); glPopMatrix();
 
     // Torso con cabeza y brazos
@@ -104,10 +110,10 @@ void personaje_dibujar(const Personaje *p, float x, float z, float angulo,
     malla_dibujar(&p->torso);
 
     glPushMatrix(); glTranslatef(-0.50f, 0.6f, 0.0f);
-    glRotatef(-balanceo * 0.9f, 1.0f, 0.0f, 0.0f); glRotatef(abre, 0.0f, 0.0f, 1.0f);
+    glRotatef(-balanceo * 0.9f - brazos_arriba * 0.8f, 1.0f, 0.0f, 0.0f); glRotatef(abre, 0.0f, 0.0f, 1.0f);
     malla_dibujar(&p->brazo); glPopMatrix();
     glPushMatrix(); glTranslatef(0.50f, 0.6f, 0.0f);
-    glRotatef(balanceo * 0.9f, 1.0f, 0.0f, 0.0f); glRotatef(-abre, 0.0f, 0.0f, 1.0f);
+    glRotatef(balanceo * 0.9f - brazos_arriba, 1.0f, 0.0f, 0.0f); glRotatef(-abre, 0.0f, 0.0f, 1.0f);
     malla_dibujar(&p->brazo); glPopMatrix();
 
     glPushMatrix(); glTranslatef(0.0f, 0.6f, 0.0f);

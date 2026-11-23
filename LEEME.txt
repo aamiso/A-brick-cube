@@ -14,3 +14,6 @@ Ahora: ~80 llamadas por cuadro y los datos viven en la memoria de video (VBO).
 
 --- 00.52 ---
 Edificios de cubitos (voxels), camara que solo se acerca (sin subir) y mas suave.
+
+--- 00.53 ---
+Camara GTA (se ve de pies a cabeza) y camara al hombro (L). Correr (R), saltar (X), carros (Triangulo).

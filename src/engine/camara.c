@@ -3,24 +3,41 @@
 #include <vitaGL.h>
 #include <math.h>
 
-#define ALTO_MIN 14.0f
-#define ALTO_MAX 70.0f
+#define ALTO_MIN -6.0f
+#define ALTO_MAX 65.0f
 #define DIST_MIN 1.6f
 #define PI_ 3.14159265f
 
 void camara_iniciar(Camara *c) {
     c->giro = 0.0f;
-    c->alto = 25.0f;
-    c->distancia = 9.0f;
-    c->real = 9.0f;
-    c->alto_real = 25.0f;
+    c->alto = 10.0f;
+    c->distancia = 6.5f;
+    c->dist_meta = 6.5f;
+    c->real = 6.5f;
+    c->alto_real = 10.0f;
+    c->hombro = 0;
+    c->desvio = 0.0f;
 }
 
-void camara_actualizar(Camara *c, float rx, float ry) {
-    c->giro += rx * 2.5f;
+void camara_actualizar(Camara *c, float rx, float ry, int alternar) {
+    if (alternar) c->hombro = !c->hombro;
+    c->giro += rx * (c->hombro ? 1.8f : 2.5f);
     c->alto += ry * 1.5f;
-    if (c->alto < ALTO_MIN) c->alto = ALTO_MIN;
-    if (c->alto > ALTO_MAX) c->alto = ALTO_MAX;
+    float min = c->hombro ? -4.0f : ALTO_MIN, max = c->hombro ? 45.0f : ALTO_MAX;
+    if (c->alto < min) c->alto = min;
+    if (c->alto > max) c->alto = max;
+    // Cada modo tiene su distancia; el cambio es suave
+    float meta = c->hombro ? 2.7f : c->dist_meta;
+    c->distancia += (meta - c->distancia) * 0.12f;
+    float des = c->hombro ? 0.95f : 0.0f;
+    c->desvio += (des - c->desvio) * 0.12f;
+}
+
+void camara_seguir(Camara *c, float heading, float cuanto) {
+    float dif = heading - c->giro;
+    while (dif > 180.0f) dif -= 360.0f;
+    while (dif < -180.0f) dif += 360.0f;
+    c->giro += dif * cuanto;
 }
 
 // ¿Hay algo que tape la cámara en ese punto? Los árboles solo cuentan justo en el punto;
@@ -69,6 +86,7 @@ static float libre_hasta(float px, float pz, float alto, float giro, float dist)
 void camara_aplicar(Camara *c, float px, float pz) {
     // La inclinación NO cambia: si algo estorba, la cámara solo se acerca al jugador.
     c->alto_real = c->alto;
+    // la cámara nunca baja del suelo: si la inclinación la metería bajo tierra, se acerca
     float meta = libre_hasta(px, pz, c->alto, c->giro, c->distancia);
     if (meta < DIST_MIN) meta = DIST_MIN;
     // Suave en los dos sentidos (así no da tirones): se acerca rápido y se aleja despacio
@@ -77,7 +95,7 @@ void camara_aplicar(Camara *c, float px, float pz) {
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    glTranslatef(0.0f, 0.0f, -c->real);
+    glTranslatef(-c->desvio, -0.15f * c->desvio, -c->real);
     glRotatef(c->alto_real, 1.0f, 0.0f, 0.0f);
     glRotatef(c->giro, 0.0f, 1.0f, 0.0f);
     glTranslatef(-px, -1.0f, -pz);
