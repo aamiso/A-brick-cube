@@ -8,7 +8,7 @@
 
 #define MAX_CARROS 10
 #define LADO 0.2f
-#define VEL_MAX 0.42f
+#define VEL_MAX 0.36f
 
 typedef struct { float x, z, ang, vel; Malla malla; } Carro;
 static Carro carros[MAX_CARROS];
@@ -97,18 +97,34 @@ void vehiculo_pos(int n, float *x, float *z, float *angulo, float *vel) {
     *x = carros[n].x; *z = carros[n].z; *angulo = carros[n].ang; *vel = carros[n].vel;
 }
 
-// ¿Choca el carro estando en (x, z) mirando a ang? (3 círculos: frente, centro y atrás)
-static int choca(float x, float z, float ang) {
+// ¿Toca un círculo en (x, z) algún carro (menos el "ignorar")?  Cada carro = 3 círculos.
+int vehiculos_choca(float x, float z, float radio, int ignorar) {
+    for (int n = 0; n < n_carros; n++) {
+        if (n == ignorar) continue;
+        float dx = carros[n].x - x, dz = carros[n].z - z;
+        if (dx * dx + dz * dz > 6.0f) continue;
+        float r = carros[n].ang * PI / 180.0f, sx = sinf(r), sz = cosf(r);
+        for (int i = -1; i <= 1; i++) {
+            float ex = carros[n].x + sx * i * 1.0f - x, ez = carros[n].z + sz * i * 1.0f - z, rr = 0.75f + radio;
+            if (ex * ex + ez * ez < rr * rr) return 1;
+        }
+    }
+    return 0;
+}
+
+// ¿Choca el carro n estando en (x, z) mirando a ang? (3 círculos + otros carros)
+static int choca(int n, float x, float z, float ang) {
     float r = ang * PI / 180.0f, sx = sinf(r), sz = cosf(r);
     for (int i = -1; i <= 1; i++)
-        if (ciudad_choca(x + sx * i * 1.0f, z + sz * i * 1.0f, 0.75f)) return 1;
+        if (ciudad_choca(x + sx * i * 1.0f, z + sz * i * 1.0f, 0.75f) ||
+            vehiculos_choca(x + sx * i * 1.0f, z + sz * i * 1.0f, 0.75f, n)) return 1;
     return 0;
 }
 
 void vehiculo_manejar(int n, float lx, float ly, int freno) {
     Carro *k = &carros[n];
     float acel = -ly;                         // arriba del stick = adelante
-    if (acel > 0.0f)      k->vel += acel * 0.010f;
+    if (acel > 0.0f)      k->vel += acel * 0.014f;
     else if (acel < 0.0f) k->vel += acel * (k->vel > 0.02f ? 0.022f : 0.007f);   // frena y luego reversa
     else                  k->vel *= 0.985f;
     if (freno) k->vel *= 0.92f;
@@ -119,13 +135,13 @@ void vehiculo_manejar(int n, float lx, float ly, int freno) {
 
     // El volante gira más cuanto más rápido va (y no gira parado)
     float v = fabsf(k->vel) / VEL_MAX;
-    float giro = -lx * 2.6f * sqrtf(v);
+    float giro = -lx * 3.4f * sqrtf(v < 0.25f ? v * 2.0f : 0.5f + v * 0.5f);
     if (k->vel < 0.0f) giro = -giro;
     float nuevo = k->ang + giro;
-    if (!choca(k->x, k->z, nuevo)) k->ang = nuevo;
+    if (!choca(n, k->x, k->z, nuevo)) k->ang = nuevo;
 
     float r = k->ang * PI / 180.0f;
     float px = k->x + sinf(r) * k->vel, pz = k->z + cosf(r) * k->vel;
-    if (!choca(px, k->z, k->ang)) k->x = px; else k->vel *= -0.3f;
-    if (!choca(k->x, pz, k->ang)) k->z = pz; else k->vel *= -0.3f;
+    if (!choca(n, px, k->z, k->ang)) k->x = px; else k->vel *= -0.3f;
+    if (!choca(n, k->x, pz, k->ang)) k->z = pz; else k->vel *= -0.3f;
 }

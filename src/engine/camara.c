@@ -43,7 +43,7 @@ void camara_seguir(Camara *c, float heading, float cuanto) {
 // ¿Hay algo que tape la cámara en ese punto? Los árboles solo cuentan justo en el punto;
 // los edificios también cuentan un poco alrededor (para no pegarse a la pared).
 static int bloqueado(float x, float y, float z, int con_margen) {
-    const float m = 0.4f, y_min = y - 0.3f;
+    const float m = 0.9f, y_min = y - 0.3f;
     if (ciudad_altura_en(x, z) > y_min) return 1;
     if (!con_margen) return 0;
     float h;
@@ -66,19 +66,20 @@ static float alcance(float px, float pz, float alto, float giro, float dist) {
 }
 
 // Hasta dónde llega la cámara sin tocar nada (afina el punto exacto)
-static float libre_hasta(float px, float pz, float alto, float giro, float dist) {
+static float libre_hasta(float px, float pz, float alto, float giro, float dist, float desvio) {
     float a = alto * PI_ / 180.0f, g = giro * PI_ / 180.0f;
     float dx = -cosf(a) * sinf(g), dy = sinf(a), dz = cosf(a) * cosf(g);
+    float rx = cosf(g) * desvio, rz = sinf(g) * desvio;   // la cámara al hombro está corrida a un lado
     float ok = 0.0f, mal = -1.0f;
     for (int k = 1; k <= 40; k++) {
         float t = dist * k / 40.0f;
-        if (bloqueado(px + dx * t, 1.0f + dy * t, pz + dz * t, t >= 2.5f)) { mal = t; break; }
+        if (bloqueado(px + dx * t + rx, 1.0f + dy * t, pz + dz * t + rz, t >= 1.0f)) { mal = t; break; }
         ok = t;
     }
     if (mal < 0.0f) return dist;
     for (int i = 0; i < 4; i++) {
         float t = (ok + mal) * 0.5f;
-        if (bloqueado(px + dx * t, 1.0f + dy * t, pz + dz * t, t >= 2.5f)) mal = t; else ok = t;
+        if (bloqueado(px + dx * t + rx, 1.0f + dy * t, pz + dz * t + rz, t >= 1.0f)) mal = t; else ok = t;
     }
     return ok - 0.15f;
 }
@@ -87,7 +88,7 @@ void camara_aplicar(Camara *c, float px, float pz) {
     // La inclinación NO cambia: si algo estorba, la cámara solo se acerca al jugador.
     c->alto_real = c->alto;
     // la cámara nunca baja del suelo: si la inclinación la metería bajo tierra, se acerca
-    float meta = libre_hasta(px, pz, c->alto, c->giro, c->distancia);
+    float meta = libre_hasta(px, pz, c->alto, c->giro, c->distancia, c->desvio);
     if (meta < DIST_MIN) meta = DIST_MIN;
     // Suave en los dos sentidos (así no da tirones): se acerca rápido y se aleja despacio
     float k = (meta < c->real) ? 0.60f : 0.05f;

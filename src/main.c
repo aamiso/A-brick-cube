@@ -39,6 +39,8 @@ int main(void) {
     vehiculos_iniciar(jugador.x, jugador.z);
     int en_carro = -1;
     unsigned prev = 0;
+    int anim = 0, anim_n = -1, anim_sube = 0;     // animación de subir / bajar del carro
+    float ax0 = 0, az0 = 0, ax1 = 0, az1 = 0;
 
     while (1) {
         SceCtrlData pad;
@@ -53,18 +55,41 @@ int main(void) {
         camara_actualizar(&camara, rx, ry, (nuevos & SCE_CTRL_LTRIGGER) != 0);
         float fx = jugador.x, fz = jugador.z;   // lo que sigue la cámara
 
-        if (en_carro < 0) {
+        if (anim > 0) {
+            // Subiendo o bajando: salta hacia la puerta (o hacia afuera) sin controles
+            anim--;
+            int total = anim_sube ? 24 : 20;
+            float k = 1.0f - (float)anim / total;
+            jugador.x = ax0 + (ax1 - ax0) * k; jugador.z = az0 + (az1 - az0) * k;
+            jugador.elev = sinf(3.14159265f * k) * 0.55f;
+            jugador.angulo = atan2f(ax1 - ax0, az1 - az0) * 57.29578f;
+            jugador.vel = 0.6f; jugador.fase += 0.3f; jugador.tiempo += 1.0f / 60.0f;
+            if (anim_n >= 0) vehiculo_manejar(anim_n, 0.0f, 0.0f, 1);
+            fx = jugador.x; fz = jugador.z;
+            if (anim == 0) {
+                jugador.elev = 0.0f; jugador.vel = 0.0f;
+                if (anim_sube) { en_carro = anim_n; camara.alto = 12.0f; }
+            }
+        } else if (en_carro < 0) {
             jugador_actualizar(&jugador, lx, ly, camara.giro, (pad.buttons & SCE_CTRL_RTRIGGER) != 0,
                                (nuevos & SCE_CTRL_CROSS) != 0);
-            if (nuevos & SCE_CTRL_TRIANGLE) en_carro = vehiculo_cercano(jugador.x, jugador.z, 3.5f);
+            if (nuevos & SCE_CTRL_TRIANGLE) {
+                int n = vehiculo_cercano(jugador.x, jugador.z, 3.5f);
+                if (n >= 0) {
+                    float a0, v0;
+                    ax0 = jugador.x; az0 = jugador.z;
+                    vehiculo_pos(n, &ax1, &az1, &a0, &v0);
+                    anim = 24; anim_n = n; anim_sube = 1;
+                }
+            }
             fx = jugador.x; fz = jugador.z;
             camara.dist_meta = 6.5f;
         } else {
             float ang, vel;
             vehiculo_manejar(en_carro, lx, ly, (pad.buttons & SCE_CTRL_SQUARE) != 0);
             vehiculo_pos(en_carro, &fx, &fz, &ang, &vel);
-            camara.dist_meta = 9.5f;
-            if (fabsf(rx) < 0.05f && fabsf(vel) > 0.05f) camara_seguir(&camara, vel > 0 ? ang : ang + 180.0f, 0.03f);
+            camara.dist_meta = 8.0f;
+            if (fabsf(rx) < 0.05f && fabsf(vel) > 0.03f) camara_seguir(&camara, ang, 0.07f);
             jugador.x = fx; jugador.z = fz; jugador.vel = 0.0f;
             if (nuevos & SCE_CTRL_TRIANGLE) {
                 // se baja por el lado derecho (o el primer lado libre)
@@ -75,7 +100,11 @@ int main(void) {
                     float ex = fx + sinf(a2) * 1.9f, ez = fz + cosf(a2) * 1.9f;
                     if (!ciudad_choca(ex, ez, 0.45f)) { jugador.x = ex; jugador.z = ez; ok = 1; }
                 }
-                if (ok) { jugador.angulo = ang; en_carro = -1; }
+                if (ok) {
+                    ax0 = fx; az0 = fz; ax1 = jugador.x; az1 = jugador.z;
+                    jugador.x = ax0; jugador.z = az0;
+                    anim = 20; anim_n = en_carro; anim_sube = 0; en_carro = -1;
+                }
             }
         }
 
@@ -86,7 +115,7 @@ int main(void) {
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        glFrustum(-0.96f, 0.96f, -0.544f, 0.544f, 1.0f, 330.0f);
+        glFrustum(-0.576f, 0.576f, -0.3264f, 0.3264f, 0.6f, 330.0f);
 
         camara_aplicar(&camara, fx, fz);
 

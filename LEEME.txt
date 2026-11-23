@@ -17,3 +17,6 @@ Edificios de cubitos (voxels), camara que solo se acerca (sin subir) y mas suave
 
 --- 00.53 ---
 Camara GTA (se ve de pies a cabeza) y camara al hombro (L). Correr (R), saltar (X), carros (Triangulo).
+
+--- 00.54 ---
+Carros solidos, camara de conduccion tipo GTA, animacion de subir/bajar del carro, camara sin ver dentro de edificios.

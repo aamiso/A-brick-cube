@@ -2,6 +2,7 @@
 #include "player/personaje.h"
 #include "world/suelo.h"
 #include "world/ciudad.h"
+#include "world/vehiculos.h"
 #include "core/util.h"
 #include <math.h>
 
@@ -39,8 +40,8 @@ void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara, int c
         objetivo = fuerza * turbo;
         // Se mueve en X y en Z por separado: si choca de frente, todavía se desliza por la pared.
         float paso_x = dx * 0.15f * turbo, paso_z = dz * 0.15f * turbo;
-        if (!ciudad_choca(j->x + paso_x, j->z, RADIO)) j->x += paso_x;
-        if (!ciudad_choca(j->x, j->z + paso_z, RADIO)) j->z += paso_z;
+        if (!ciudad_choca(j->x + paso_x, j->z, RADIO) && !vehiculos_choca(j->x + paso_x, j->z, RADIO, -1)) j->x += paso_x;
+        if (!ciudad_choca(j->x, j->z + paso_z, RADIO) && !vehiculos_choca(j->x, j->z + paso_z, RADIO, -1)) j->z += paso_z;
 
         // Gira suave hacia donde camina (por el camino más corto)
         float meta = atan2f(dx, dz) * 180.0f / PI;

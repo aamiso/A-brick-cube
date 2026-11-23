@@ -6,6 +6,9 @@
 void vehiculos_iniciar(float cx, float cz);
 void vehiculos_dibujar(float px, float pz);
 
+// 1 si un círculo toca algún carro (menos el número "ignorar"; -1 = ninguno)
+int vehiculos_choca(float x, float z, float radio, int ignorar);
+
 // Número del carro más cercano a menos de "alcance" unidades (-1 si no hay)
 int  vehiculo_cercano(float x, float z, float alcance);
 
