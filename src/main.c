@@ -34,9 +34,9 @@ int main(void) {
     Camara camara;
     jugador_iniciar(&jugador);
     ciudad_inicio(&jugador.x, &jugador.z); // empieza donde dice la P del mapa
-    ciudad_precalentar(fx, fz);
+    ciudad_precalentar(jugador.x, jugador.z);
     camara_iniciar(&camara);
-    vehiculos_iniciar(fx, fz);
+    vehiculos_iniciar(jugador.x, jugador.z);
     int en_carro = -1;
     unsigned prev = 0;
 
