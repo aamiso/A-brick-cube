@@ -40,3 +40,5 @@ Torres gemelas grandes (28x22 celdas, 6 pisos) segun la referencia.
 Manejo estilo GTA (R acelera, L freno/reversa, cuadrado freno de mano/derrape), camara de persecucion, carros nuevos (sedan, camioneta, patrulla, deportivo, taxi). Modelos: se restauraron entradas y marquesinas (solo se tapan huecos internos).
 
 v00.63: ventanas de dialogo estilo Pokemon y NPCs. Camina cerca de alguien y pulsa O (circulo) para hablar. X o O avanza el texto.
+
+v00.64: camara del carro fija detras; NPCs ya no se quedan atascados con los carros.

@@ -117,18 +117,7 @@ int main(void) {
             camara.hombro = 0;
             camara.sin_choque = 1;
             camara.dist_meta = 7.5f + 3.0f * (rapidez / 0.55f);
-            if (fabsf(rx) > 0.15f) { camara.giro += rx * 2.5f; mirar = 70; }
-            else if (mirar > 0) mirar--;
-            else {
-                float objetivo = ang;                                    // hacia donde apunta
-                if (rapidez > 0.12f) {                                   // y un poco hacia donde se mueve (derrape)
-                    float dir = atan2f(vx, vz) * 57.29578f, d = dir - ang;
-                    while (d > 180.0f) d -= 360.0f;
-                    while (d < -180.0f) d += 360.0f;
-                    if (fabsf(d) < 100.0f) objetivo = ang + d * 0.5f;
-                }
-                camara_seguir(&camara, objetivo, 0.05f + 0.05f * (rapidez / 0.55f));
-            }
+            camara_seguir(&camara, ang, 0.35f);                      // siempre detrás del carro
             camara.alto += (10.0f - camara.alto) * 0.05f;
             jugador.x = fx; jugador.z = fz; jugador.vel = 0.0f;
             if (nuevos & SCE_CTRL_TRIANGLE) {

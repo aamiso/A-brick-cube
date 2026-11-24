@@ -122,6 +122,16 @@ void npcs_actualizar(float px, float pz) {
         Npc *n = &npcs[i];
         if (fabsf(n->x - px) > 70.0f || fabsf(n->z - pz) > 70.0f) continue;
         n->tiempo += 1.0f / 60.0f;
+        if (vehiculos_choca(n->x, n->z, RADIO_NPC, -1)) {            // un carro lo alcanzó: sale por el lado libre
+            for (int k = 0; k < 16; k++) {
+                float a = k * 0.3927f;
+                for (float d = 0.4f; d <= 2.4f; d += 0.4f) {
+                    float sx = n->x + sinf(a) * d, sz = n->z + cosf(a) * d;
+                    if (!vehiculos_choca(sx, sz, RADIO_NPC, -1) && !ciudad_choca(sx, sz, RADIO_NPC)) { n->x = sx; n->z = sz; k = 99; break; }
+                }
+            }
+            n->espera = 20;
+        }
         if (n->hablando) { n->vel += (0.0f - n->vel) * 0.2f; continue; }
         if (--n->espera <= 0) {
             n->caminando = !n->caminando || (azar() % 4 == 0);
