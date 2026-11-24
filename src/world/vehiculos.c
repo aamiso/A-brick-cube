@@ -193,43 +193,48 @@ void vehiculos_pasivos(int activo) {
         if (i != activo && (fabsf(carros[i].vx) + fabsf(carros[i].vz) > 0.003f)) vehiculo_manejar(i, 0.0f, 0.0f, 0.25f, 0);
 }
 
-// Manejo estilo arcade (como GTA): acelerador, freno/reversa, volante suave, agarre lateral y freno de mano que derrapa.
+// Manejo nuevo (arcade simple y predecible): el carro SIEMPRE avanza hacia donde apunta.
+//  gas/freno cambian la rapidez; el volante gira el carro según la rapidez; sin deslizamiento lateral.
+//  mano = freno de mano: frena fuerte y gira más cerrado.
 void vehiculo_manejar(int n, float volante, float gas, float freno, int mano) {
     Carro *k = &carros[n];
-    float r = k->ang * PI / 180.0f, fx = sinf(r), fz = cosf(r), rx = fz, rz = -fx;
-    float vf = k->vx * fx + k->vz * fz, vl = k->vx * rx + k->vz * rz;
+    float v = k->vel;                                   // rapidez con signo (+ adelante)
+    const float REV_MAX = VEL_MAX * 0.3f;
 
-    // motor: la fuerza baja al acercarse a la velocidad máxima
-    if (gas > 0.0f) vf += gas * 0.0065f * (1.0f - fmaxf(vf, 0.0f) / VEL_MAX);
-    if (freno > 0.0f) {
-        if (vf > 0.02f) vf -= freno * 0.022f;                                    // frena
-        else            vf -= freno * 0.010f * (1.0f + vf / (VEL_MAX * 0.35f)); // reversa lenta
+    if (gas > 0.0f) {
+        if (v < 0.0f) v += gas * 0.03f;                 // viene en reversa: primero frena
+        else v += gas * 0.008f * (1.0f - v / VEL_MAX);
     }
-    if (gas <= 0.0f && freno <= 0.0f) { vf *= 0.992f; if (fabsf(vf) < 0.004f) vf = 0.0f; }
-    vf *= 0.9985f;
-    if (vf < -VEL_MAX * 0.35f) vf = -VEL_MAX * 0.35f;
+    if (freno > 0.0f) {
+        if (v > 0.0f) { v -= freno * 0.02f; if (v < 0.0f) v = 0.0f; }
+        else v -= freno * 0.006f;                       // reversa
+    }
+    if (gas <= 0.0f && freno <= 0.0f) {                 // sin tocar nada: se detiene poco a poco
+        v *= 0.985f;
+        if (fabsf(v) < 0.004f) v = 0.0f;
+    }
+    if (mano) { v *= 0.93f; if (fabsf(v) < 0.004f) v = 0.0f; }
+    if (v > VEL_MAX) v = VEL_MAX;
+    if (v < -REV_MAX) v = -REV_MAX;
 
-    // agarre: la velocidad de costado se apaga rápido (poco con freno de mano = derrape)
-    vl *= mano ? 0.95f : 0.80f;
-    if (mano) vf *= 0.985f;
-
-    // volante: gira suave y se endurece con la velocidad
-    k->volante += (volante - k->volante) * 0.22f;
-    float rapido = fabsf(vf) / VEL_MAX;
-    float max_giro = 0.58f / (1.0f + 2.8f * rapido * rapido);        // radianes (33° a baja velocidad)
-    float gir = -tanf(k->volante * max_giro) * vf / EMPATE;          // radianes por cuadro
-    if (mano) gir *= 1.5f;
-    float nuevo = k->ang + gir * 57.29578f;
+    // volante: suave, y gira menos cuando vas rápido; casi no gira si estás parado
+    k->volante += (volante - k->volante) * 0.25f;
+    float rel = fabsf(v) / VEL_MAX;
+    float agarre = fminf(1.0f, fabsf(v) / 0.10f);                    // parado = no gira
+    float giro = k->volante * (2.6f - 1.6f * rel) * agarre;          // grados por cuadro
+    if (mano) giro *= 1.6f;
+    if (v < 0.0f) giro = -giro;
+    float nuevo = k->ang - giro;
     if (!choca(n, k->x, k->z, nuevo)) k->ang = nuevo;
-    else vf *= 0.9f;
+    else v *= 0.9f;
 
-    r = k->ang * PI / 180.0f; fx = sinf(r); fz = cosf(r); rx = fz; rz = -fx;
-    k->vx = fx * vf + rx * vl; k->vz = fz * vf + rz * vl;
+    float r = k->ang * PI / 180.0f, fx = sinf(r), fz = cosf(r);
+    float nx = k->x + fx * v, nz = k->z + fz * v;
+    if (!choca(n, nx, nz, k->ang)) { k->x = nx; k->z = nz; }
+    else if (!choca(n, nx, k->z, k->ang)) k->x = nx, v *= 0.6f;      // roza una pared: se desliza
+    else if (!choca(n, k->x, nz, k->ang)) k->z = nz, v *= 0.6f;
+    else v = -v * 0.2f;                                              // choque de frente: rebota un poquito
 
-    float nx = k->x + k->vx, nz = k->z + k->vz;
-    int c1 = choca(n, nx, k->z, k->ang), c2 = choca(n, k->x, nz, k->ang);
-    if (!c1) k->x = nx; else { k->vx = -k->vx * 0.25f; }
-    if (!c2) k->z = nz; else { k->vz = -k->vz * 0.25f; }
-    if (c1 || c2) { k->vx *= 0.8f; k->vz *= 0.8f; }
-    k->vel = k->vx * sinf(k->ang * PI / 180.0f) + k->vz * cosf(k->ang * PI / 180.0f);
+    k->vel = v;
+    k->vx = fx * v; k->vz = fz * v;
 }

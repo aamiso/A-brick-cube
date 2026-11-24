@@ -45,7 +45,6 @@ int main(void) {
     int en_carro = -1;
     int hablando = -1;
     unsigned prev = 0;
-    int mirar = 0;
     int anim = 0, anim_n = -1, anim_sube = 0;     // animación de subir / bajar del carro
     float ax0 = 0, az0 = 0, ax1 = 0, az1 = 0;
 
@@ -112,13 +111,12 @@ int main(void) {
             vehiculo_manejar(en_carro, lx, gas, frn, (pad.buttons & SCE_CTRL_SQUARE) != 0);
             vehiculo_pos(en_carro, &fx, &fz, &ang, &vel);
             vehiculo_velocidad(en_carro, &vx, &vz);
-            float rapidez = sqrtf(vx * vx + vz * vz);
             // Cámara de persecución: va detrás del carro con un poco de retraso; el stick derecho mira alrededor
             camara.hombro = 0;
             camara.sin_choque = 1;
-            camara.dist_meta = 7.5f + 3.0f * (rapidez / 0.55f);
-            camara_seguir(&camara, ang, 0.35f);                      // siempre detrás del carro
-            camara.alto += (10.0f - camara.alto) * 0.05f;
+            camara.dist_meta = 8.0f;
+            camara.giro = ang;                                       // COMPLETAMENTE fija detrás del carro
+            camara.alto = 10.0f;
             jugador.x = fx; jugador.z = fz; jugador.vel = 0.0f;
             if (nuevos & SCE_CTRL_TRIANGLE) {
                 // se baja por el lado derecho (o el primer lado libre)

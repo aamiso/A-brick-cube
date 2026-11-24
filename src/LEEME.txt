@@ -1,0 +1,46 @@
+A Brick Cube - Fase 5
+
+src/                código del juego
+data/mapas/         ciudad.txt (el mapa, 300 x 300)
+data/modelos/       casa_roja, casa_azul, casa_moderna, banco, cafe (modelos voxel en texto)
+tools/              generar_mapa.py (genera un mapa de ejemplo)
+
+Para cambiar un modelo: abre el Visor Voxel, edita, copia el texto y reemplaza el archivo en data/modelos/ (mismo nombre).
+Para cambiar el mapa: reemplaza data/mapas/ciudad.txt.
+
+--- Version 00.51: optimizacion ---
+Antes: ~1.200 llamadas de dibujo por cuadro y 4 MB de datos copiados cada cuadro (11 FPS en Vita3K).
+Ahora: ~80 llamadas por cuadro y los datos viven en la memoria de video (VBO).
+
+--- 00.52 ---
+Edificios de cubitos (voxels), camara que solo se acerca (sin subir) y mas suave.
+
+--- 00.53 ---
+Camara GTA (se ve de pies a cabeza) y camara al hombro (L). Correr (R), saltar (X), carros (Triangulo).
+
+--- 00.54 ---
+Carros solidos, camara de conduccion tipo GTA, animacion de subir/bajar del carro, camara sin ver dentro de edificios.
+
+--- 00.57 ---
+Modelos hechos a mano: hospital(Y) edificio rojo(R) torre dorada(V) farmacia(M) hotel(U). Calles de 12 de ancho. Arboles voxel nuevos. Carros: sedan, camioneta, patrulla. Mallas con caras unidas (menos triangulos). Los modelos se regeneran con tools/hacer_modelos.py
+
+--- 00.58 ---
+Suelo con profundidad por capas (sin transparencias). Fisica de salto: se puede subir a lo que alcance el salto (hasta ~1.5 de alto); cae al salir del borde.
+
+--- 00.59 ---
+Modelos nuevos: torres gemelas(O) oficina moderna(I) edificio colorido(Z) centro comercial(s).
+
+--- 00.60 ---
+Todos los modelos macizos (sin huecos), torres gemelas mas chicas, arboles sin huecos.
+
+--- 00.61 ---
+Torres gemelas grandes (28x22 celdas, 6 pisos) segun la referencia.
+
+--- 00.62 ---
+Manejo estilo GTA (R acelera, L freno/reversa, cuadrado freno de mano/derrape), camara de persecucion, carros nuevos (sedan, camioneta, patrulla, deportivo, taxi). Modelos: se restauraron entradas y marquesinas (solo se tapan huecos internos).
+
+v00.63: ventanas de dialogo estilo Pokemon y NPCs. Camina cerca de alguien y pulsa O (circulo) para hablar. X o O avanza el texto.
+
+v00.64: camara del carro fija detras; NPCs ya no se quedan atascados con los carros.
+
+v00.65: conduccion reescrita desde cero (el carro va hacia donde apunta, sin derrape raro) y camara trasera completamente fija.
