@@ -82,7 +82,7 @@ def subdividir(x0, z0, w, d, minimo):
         return subdividir(x0, z0, w, c, minimo) + subdividir(x0, z0 + c, w, d - c, minimo)
     return [(x0, z0, w, d)]
 
-TAM = {'H': (10, 9), 'J': (11, 11), 'K': (13, 11), 'X': (15, 13), 'Q': (16, 14), 'Y': (22, 16), 'R': (9, 9), 'V': (14, 14), 'M': (12, 10), 'U': (16, 14), 'O': (14, 11), 'I': (16, 14), 'Z': (12, 12), 's': (14, 12)}
+TAM = {'H': (10, 9), 'J': (11, 11), 'K': (13, 11), 'X': (15, 13), 'Q': (16, 14), 'Y': (22, 16), 'R': (9, 9), 'V': (14, 14), 'M': (12, 10), 'U': (16, 14), 'O': (28, 22), 'I': (16, 14), 'Z': (12, 12), 's': (14, 12)}
 cuenta = {'X': 0, 'Q': 0, 'Y': 0, 'R': 0, 'V': 0, 'M': 0, 'U': 0, 'O': 0, 'I': 0, 'Z': 0, 's': 0}
 LIMITE = {'X': 5, 'Q': 10, 'Y': 2, 'R': 10, 'V': 4, 'M': 6, 'U': 4, 'O': 3, 'I': 6, 'Z': 10, 's': 6}
 def lugar_modelo(a, b, c, e, letras, prob):
@@ -133,8 +133,9 @@ for i in idx:
     if dist < 55:      # centro: rascacielos
         lotes = subdividir(x0, z0, w, d, 12)
         grande = [k for k in 'YO' if cuenta[k] < LIMITE[k]]
-        if grande and w >= 24 and d >= 18 and random.random() < 0.7:
-            k = random.choice(grande); kw, kd = TAM[k]
+        k = random.choice(grande) if grande else None
+        if k and w >= TAM[k][0] + 2 and d >= TAM[k][1] + 2 and random.random() < 0.8:
+            kw, kd = TAM[k]
             rect(x0 + 1, z0 + 1, kw, kd, k); cuenta[k] += 1         # hospital / torres gemelas
             lotes = subdividir(x0 + kw + 2, z0, w - kw - 2, d, 9) + subdividir(x0, z0 + kd + 2, kw + 2, d - kd - 2, 9)
             lotes = [l for l in lotes if l[2] >= 12 and l[3] >= 12]
@@ -142,7 +143,7 @@ for i in idx:
             if not lugar_modelo(a, b, c, e, 'YVUXQROIZs', 0.65): lote(a, b, c, e, 'EEDDFNA', 10, 18)
     elif dist < 105:   # anillo medio: oficinas, departamentos, tiendas, bancos y cafés
         for (a, b, c, e) in subdividir(x0, z0, w, d, 10):
-            if not lugar_modelo(a, b, c, e, 'RRMMXQUZZssIO', 0.70): lote(a, b, c, e, 'ABFLLCNB', 8, 13)
+            if not lugar_modelo(a, b, c, e, 'RRMMXQUZZssI', 0.70): lote(a, b, c, e, 'ABFLLCNB', 8, 13)
     else:              # afueras: casas con modelo y jardín
         for (a, b, c, e) in subdividir(x0, z0, w, d, 12):
             if random.random() < 0.10:

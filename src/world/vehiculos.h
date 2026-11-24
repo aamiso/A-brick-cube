@@ -12,8 +12,11 @@ int vehiculos_choca(float x, float z, float radio, int ignorar);
 // Número del carro más cercano a menos de "alcance" unidades (-1 si no hay)
 int  vehiculo_cercano(float x, float z, float alcance);
 
-// Maneja el carro n. lx = volante (-1..1), ly = stick (arriba = -1 = acelerar), freno = 1 si frena
-void vehiculo_manejar(int n, float lx, float ly, int freno);
+// Maneja el carro n: volante -1..1 (izquierda negativo), gas 0..1, freno/reversa 0..1, mano = freno de mano
+void vehiculo_manejar(int n, float volante, float gas, float freno, int mano);
+void vehiculos_pasivos(int activo);
+// Velocidad del carro en el mundo
+void vehiculo_velocidad(int n, float *vx, float *vz);
 void vehiculo_pos(int n, float *x, float *z, float *angulo, float *vel);
 
 #endif

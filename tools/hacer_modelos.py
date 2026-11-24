@@ -31,18 +31,19 @@ class V:
             cx += len(f[0]) + 1
     def ancho_texto(s, t): return sum(len(FONT[c][0]) + 1 for c in t) - 1
     def rellenar(s, saltar=None):
-        # Tapa todo hueco: en cada columna se llena desde el suelo hasta lo más alto (con el color de lo que tiene encima)
+        # Solo tapa huecos INTERNOS: espacio vacío con algo debajo en la misma columna.
+        # (Entradas, marquesinas y soportales se quedan como están.)
         for z in range(s.D):
             for x in range(s.W):
                 if saltar and saltar(x, z): continue
                 top = -1
                 for y in range(1, s.H):
                     if s.g[y][z][x] != '.': top = y
-                if top < 1: continue
-                arriba = s.g[top][z][x]
-                for y in range(top, 0, -1):
-                    if s.g[y][z][x] == '.': s.g[y][z][x] = arriba
-                    else: arriba = s.g[y][z][x]
+                abajo = None
+                for y in range(1, top + 1):
+                    c = s.g[y][z][x]
+                    if c != '.': abajo = c
+                    elif abajo: s.g[y][z][x] = abajo
     def guardar(s):
         s.rellenar(getattr(s, 'saltar', None))
         with open(os.path.join(SAL, s.n + '.txt'), 'w') as f:
@@ -240,27 +241,39 @@ def hotel():
     v.guardar()
 
 
-# ---------------- TORRES GEMELAS con puente (14 x 11 celdas) ----------------
+# ---------------- TORRES GEMELAS grandes (28 x 22 celdas) ----------------
 def gemelas():
-    v = V('torres_gemelas', 28, 22, 30, dict(P='d8d4c8', G='3fae3a', w='e9e9f2', W='ffffff', g='b9b9c6', V='2f58c8', k='25272c', m='8c8c94', Y='f4e04a', h='9aa0aa'))
-    v.box(0, 0, 0, 28, 1, 22, 'G'); v.box(1, 0, 2, 26, 1, 18, 'P')
-    def ala(x0):
-        v.box(x0, 1, 3, 9, 23, 15, 'w')
-        for f in range(3):
+    v = V('torres_gemelas', 56, 44, 52, dict(P='d8d4c8', G='3fae3a', w='e9e9f2', W='ffffff', g='b9b9c6', V='2f58c8', v='4a78e0', k='25272c', m='8c8c94', Y='f4e04a', h='9aa0aa', d='c9c9d6'))
+    v.box(0, 0, 0, 56, 1, 44, 'G'); v.box(2, 0, 3, 52, 1, 38, 'P')
+    PISOS = 6
+    top = 1 + PISOS * 7
+    def ala(x0, interior):
+        v.box(x0, 1, 4, 20, top - 1, 32, 'w')                      # cuerpo
+        for f in range(PISOS):
             y0 = 3 + f * 7
-            for xx in (x0 + 1, x0 + 5):
-                v.box(xx, y0, 18, 3, 4, 1, 'V')
-            v.box(x0, y0 + 5, 3, 9, 1, 15, 'W')
-            for zz in (6, 11, 15):
-                v.box(x0 if x0 > 10 else x0 + 8, y0, zz, 1, 4, 2, 'V')
-        v.box(x0 + 3, 1, 18, 3, 3, 1, 'k')
-        v.box(x0, 24, 3, 9, 1, 15, 'W'); v.box(x0 + 1, 24, 4, 7, 1, 13, 'k')
-        v.box(x0 + 2, 24, 6, 5, 1, 5, 'Y'); v.box(x0 + 3, 24, 7, 3, 1, 3, 'k')
-        v.box(x0 + 2, 25, 13, 3, 2, 3, 'm')
-    ala(1); ala(18)
-    v.box(10, 1, 6, 8, 20, 9, 'g')                               # puente / cuerpo central (macizo)
-    for f in range(3): v.box(10, 4 + f * 7, 15, 8, 1, 1, 'h')
-    v.box(10, 21, 6, 8, 1, 9, 'W')
+            for xx in (x0 + 2, x0 + 11):                           # ventanas del frente
+                v.box(xx, y0, 35, 7, 4, 1, 'V'); v.box(xx + 3, y0, 35, 1, 4, 1, 'v')
+            for zz in (7, 15, 23):                                 # ventanas de los costados
+                v.box(x0 - 0, y0, zz, 1, 4, 5, 'V'); v.box(x0 + 19, y0, zz, 1, 4, 5, 'V')
+            v.box(x0, y0 + 5, 4, 20, 1, 32, 'W')                   # franja blanca entre pisos
+            v.box(x0, y0 - 2, 36, 20, 1, 1, 'W') if f else None
+        # costillas (columnas estriadas) en la esquina del frente junto al puente
+        for k in range(6):
+            xx = x0 + (14 + k if interior else k)
+            v.box(xx, 1, 36 if k % 2 == 0 else 35, 1, top - 1, 1, 'W')
+        v.box(x0 + 7, 1, 35, 6, 4, 2, 'k') if False else None
+        v.box(x0 + 8, 1, 36, 5, 4, 1, 'k')                         # puerta
+        v.box(x0, top, 4, 20, 1, 32, 'W'); v.box(x0 + 1, top, 5, 18, 1, 30, 'k')   # techo oscuro
+        v.box(x0 + 4, top, 18, 12, 1, 12, 'Y'); v.box(x0 + 5, top, 19, 10, 1, 10, 'k'); v.box(x0 + 7, top, 22, 6, 1, 1, 'Y')   # helipuerto
+        v.box(x0 + 3, top + 1, 6, 10, 5, 8, 'm'); v.box(x0 + 5, top + 1, 14, 5, 4, 1, 'k') # cuarto de techo con puerta
+    ala(2, 1); ala(34, 0)
+    # puente central macizo con pisos marcados
+    v.box(22, 1, 10, 12, top - 1, 20, 'd')
+    for f in range(PISOS):
+        y0 = 3 + f * 7
+        v.box(22, y0, 30, 12, 4, 1, 'g'); v.box(22, y0 + 4, 30, 12, 1, 1, 'W'); v.box(22, y0 + 5, 30, 12, 2, 1, 'h')
+        for xx in range(23, 33, 3): v.box(xx, y0, 30, 1, 4, 1, 'm')
+    v.box(22, top, 10, 12, 1, 20, 'W')
     v.guardar()
 
 # ---------------- OFICINA MODERNA blanca con vidrio (16 x 14 celdas) ----------------

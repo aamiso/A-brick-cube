@@ -32,3 +32,11 @@ Modelos nuevos: torres gemelas(O) oficina moderna(I) edificio colorido(Z) centro
 
 --- 00.60 ---
 Todos los modelos macizos (sin huecos), torres gemelas mas chicas, arboles sin huecos.
+
+--- 00.61 ---
+Torres gemelas grandes (28x22 celdas, 6 pisos) segun la referencia.
+
+--- 00.62 ---
+Manejo estilo GTA (R acelera, L freno/reversa, cuadrado freno de mano/derrape), camara de persecucion, carros nuevos (sedan, camioneta, patrulla, deportivo, taxi). Modelos: se restauraron entradas y marquesinas (solo se tapan huecos internos).
+
+v00.63: ventanas de dialogo estilo Pokemon y NPCs. Camina cerca de alguien y pulsa O (circulo) para hablar. X o O avanza el texto.

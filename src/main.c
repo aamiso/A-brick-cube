@@ -20,7 +20,11 @@
 #include "world/frontera.h"
 #include "world/terreno.h"
 #include "world/vehiculos.h"
+#include "world/npcs.h"
+#include "ui/ui.h"
+#include "ui/dialogo.h"
 #include <math.h>
+#include <stdio.h>
 
 int main(void) {
     vglInit(0x1000000);
@@ -37,8 +41,11 @@ int main(void) {
     ciudad_precalentar(jugador.x, jugador.z);
     camara_iniciar(&camara);
     vehiculos_iniciar(jugador.x, jugador.z);
+    npcs_iniciar(jugador.x, jugador.z);
     int en_carro = -1;
+    int hablando = -1;
     unsigned prev = 0;
+    int mirar = 0;
     int anim = 0, anim_n = -1, anim_sube = 0;     // animación de subir / bajar del carro
     float ax0 = 0, az0 = 0, ax1 = 0, az1 = 0;
 
@@ -54,6 +61,8 @@ int main(void) {
         float rx = leer_stick(pad.rx), ry = leer_stick(pad.ry);
         // En el carro la cámara va fija detrás (como GTA): el stick derecho no la mueve
         camara_actualizar(&camara, en_carro >= 0 ? 0.0f : rx, en_carro >= 0 ? 0.0f : ry, en_carro >= 0 ? 0 : (nuevos & SCE_CTRL_LTRIGGER) != 0);
+        npcs_actualizar(jugador.x, jugador.z);
+        vehiculos_pasivos(en_carro >= 0 ? en_carro : (anim > 0 ? anim_n : -1));
         if (en_carro < 0) camara.sin_choque = 0;
         float fx = jugador.x, fz = jugador.z;   // lo que sigue la cámara
 
@@ -66,16 +75,25 @@ int main(void) {
             jugador.elev = sinf(3.14159265f * k) * 0.55f;
             jugador.angulo = atan2f(ax1 - ax0, az1 - az0) * 57.29578f;
             jugador.vel = 0.6f; jugador.fase += 0.3f; jugador.tiempo += 1.0f / 60.0f;
-            if (anim_n >= 0) vehiculo_manejar(anim_n, 0.0f, 0.0f, 1);
+            if (anim_n >= 0) vehiculo_manejar(anim_n, 0.0f, 0.0f, 1.0f, 0);
             fx = jugador.x; fz = jugador.z;
             if (anim == 0) {
                 jugador.elev = 0.0f; jugador.vel = 0.0f;
                 if (anim_sube) { en_carro = anim_n; camara.alto = 12.0f; }
             }
         } else if (en_carro < 0) {
-            jugador_actualizar(&jugador, lx, ly, camara.giro, (pad.buttons & SCE_CTRL_RTRIGGER) != 0,
-                               (nuevos & SCE_CTRL_CROSS) != 0);
-            if (nuevos & SCE_CTRL_TRIANGLE) {
+            if (hablando >= 0) {
+                jugador_actualizar(&jugador, 0, 0, camara.giro, 0, 0);
+                if (dialogo_actualizar((nuevos & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) != 0)) { npc_soltar(hablando); hablando = -1; }
+            } else {
+                jugador_actualizar(&jugador, lx, ly, camara.giro, (pad.buttons & SCE_CTRL_RTRIGGER) != 0,
+                                   (nuevos & SCE_CTRL_CROSS) != 0);
+                if (nuevos & SCE_CTRL_CIRCLE) {
+                    int q = npc_cercano(jugador.x, jugador.z, 2.4f);
+                    if (q >= 0) { hablando = q; npc_hablar(q, jugador.x, jugador.z); }
+                }
+            }
+            if (hablando < 0 && (nuevos & SCE_CTRL_TRIANGLE)) {
                 int n = vehiculo_cercano(jugador.x, jugador.z, 3.5f);
                 if (n >= 0) {
                     float a0, v0;
@@ -87,15 +105,31 @@ int main(void) {
             fx = jugador.x; fz = jugador.z;
             camara.dist_meta = 6.5f;
         } else {
-            float ang, vel;
-            vehiculo_manejar(en_carro, lx, ly, (pad.buttons & SCE_CTRL_SQUARE) != 0);
+            float ang, vel, vx, vz;
+            // R = acelerar, L = freno / reversa, stick (arriba/abajo) hace lo mismo, cuadrado = freno de mano
+            float gas = (pad.buttons & SCE_CTRL_RTRIGGER) ? 1.0f : (ly < 0.0f ? -ly : 0.0f);
+            float frn = (pad.buttons & SCE_CTRL_LTRIGGER) ? 1.0f : (ly > 0.0f ? ly : 0.0f);
+            vehiculo_manejar(en_carro, lx, gas, frn, (pad.buttons & SCE_CTRL_SQUARE) != 0);
             vehiculo_pos(en_carro, &fx, &fz, &ang, &vel);
-            camara.dist_meta = 8.0f;
+            vehiculo_velocidad(en_carro, &vx, &vz);
+            float rapidez = sqrtf(vx * vx + vz * vz);
+            // Cámara de persecución: va detrás del carro con un poco de retraso; el stick derecho mira alrededor
             camara.hombro = 0;
             camara.sin_choque = 1;
-            camara_seguir(&camara, ang, 0.16f);
-            camara.alto += (11.0f - camara.alto) * 0.08f;
-            (void)vel;
+            camara.dist_meta = 7.5f + 3.0f * (rapidez / 0.55f);
+            if (fabsf(rx) > 0.15f) { camara.giro += rx * 2.5f; mirar = 70; }
+            else if (mirar > 0) mirar--;
+            else {
+                float objetivo = ang;                                    // hacia donde apunta
+                if (rapidez > 0.12f) {                                   // y un poco hacia donde se mueve (derrape)
+                    float dir = atan2f(vx, vz) * 57.29578f, d = dir - ang;
+                    while (d > 180.0f) d -= 360.0f;
+                    while (d < -180.0f) d += 360.0f;
+                    if (fabsf(d) < 100.0f) objetivo = ang + d * 0.5f;
+                }
+                camara_seguir(&camara, objetivo, 0.05f + 0.05f * (rapidez / 0.55f));
+            }
+            camara.alto += (10.0f - camara.alto) * 0.05f;
             jugador.x = fx; jugador.z = fz; jugador.vel = 0.0f;
             if (nuevos & SCE_CTRL_TRIANGLE) {
                 // se baja por el lado derecho (o el primer lado libre)
@@ -139,8 +173,23 @@ int main(void) {
         ciudad_dibujar(fx, fz, camara.giro);   // edificios, árboles y lugares con modelo
         frontera_dibujar(fx, fz);
         vehiculos_dibujar(fx, fz);
+        npcs_dibujar(fx, fz);
         if (en_carro < 0) jugador_dibujar(&jugador);
         cubo_desactivar();
+
+        // 3) Interfaz 2D
+        ui_inicio();
+        if (hablando >= 0) dialogo_dibujar();
+        else if (en_carro < 0 && anim <= 0) {
+            int q = npc_cercano(jugador.x, jugador.z, 2.4f);
+            if (q >= 0) {
+                char t[80]; snprintf(t, sizeof(t), "○ Hablar con %s", npc_nombre(q));
+                int w = (int)ui_ancho(t, 1);
+                ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
+                ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
+            }
+        }
+        ui_fin();
 
         vglSwapBuffers(GL_FALSE);
     }
