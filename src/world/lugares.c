@@ -213,3 +213,16 @@ float lugares_altura(float x, float z) {
     }
     return mejor;
 }
+
+char lugar_entrada_cerca(float x, float z, float alcance) {
+    for (int i = 0; i < n_lugares; i++) {
+        const Lugar *l = &lugares[i];
+        char ch = tipos[l->tipo].letra;
+        if (ch != 'Y' && ch != 'Q' && ch != 'M' && ch != 'X') continue;
+        float dx = fabsf(x - l->x) - l->w * 0.5f, dz = fabsf(z - l->z) - l->d * 0.5f;
+        if (dx < 0) dx = 0;
+        if (dz < 0) dz = 0;
+        if (dx * dx + dz * dz < alcance * alcance) return ch;
+    }
+    return 0;
+}

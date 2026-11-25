@@ -21,6 +21,8 @@
 #include "world/terreno.h"
 #include "world/vehiculos.h"
 #include "world/npcs.h"
+#include "world/interior.h"
+#include "world/lugares.h"
 #include "ui/ui.h"
 #include "ui/dialogo.h"
 #include <math.h>
@@ -44,6 +46,11 @@ int main(void) {
     npcs_iniciar(jugador.x, jugador.z);
     int en_carro = -1;
     int hablando = -1;
+    char dentro = 0;                       // letra del lugar donde estamos (0 = en la calle)
+    int hablando_i = -1, fase_f = 0, fund = 0, pend_salir = 0;
+    char pend_l = 0;
+    float gx = 0, gz = 0, gsuelo = 0;      // dónde estaba en la calle
+    Camara cam_guardada;
     unsigned prev = 0;
     int anim = 0, anim_n = -1, anim_sube = 0;     // animación de subir / bajar del carro
     float ax0 = 0, az0 = 0, ax1 = 0, az1 = 0;
@@ -58,6 +65,64 @@ int main(void) {
         prev = pad.buttons;
         float lx = leer_stick(pad.lx), ly = leer_stick(pad.ly);
         float rx = leer_stick(pad.rx), ry = leer_stick(pad.ry);
+        // --- Transición (fundido a negro) ---
+        if (fase_f == 1) {
+            if (++fund >= 14) {
+                fund = 14; fase_f = -1;
+                if (pend_salir) {
+                    interior_salir(); dentro = 0; pend_salir = 0; hablando_i = -1;
+                    jugador.x = gx; jugador.z = gz; jugador.suelo = jugador.elev = gsuelo; jugador.vel = 0; camara = cam_guardada;
+                } else {
+                    gx = jugador.x; gz = jugador.z; gsuelo = jugador.suelo; cam_guardada = camara;
+                    interior_entrar(pend_l, &jugador); dentro = pend_l; hablando = -1;
+                }
+            }
+        } else if (fase_f == -1) { if (--fund <= 0) { fund = 0; fase_f = 0; } }
+        if (fase_f) { lx = ly = 0.0f; nuevos &= ~(SCE_CTRL_CROSS | SCE_CTRL_CIRCLE | SCE_CTRL_TRIANGLE); }
+
+        // --- Dentro de un lugar: cámara fija desde arriba, como Pokémon ---
+        if (dentro) {
+            if (hablando_i >= 0) {
+                interior_actualizar(&jugador, 0, 0, 0);
+                if (dialogo_actualizar((nuevos & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) != 0)) hablando_i = -1;
+            } else {
+                if (interior_actualizar(&jugador, lx, ly, (pad.buttons & SCE_CTRL_RTRIGGER) != 0) && fase_f == 0) { pend_salir = 1; fase_f = 1; }
+                if (nuevos & SCE_CTRL_CIRCLE) {
+                    int q = interior_npc_cercano(&jugador, 1.7f);
+                    if (q >= 0) { hablando_i = q; interior_hablar(q, &jugador); }
+                }
+            }
+            camara.hombro = 0; camara.desvio = 0; camara.sin_choque = 1; camara.giro = 0.0f; camara.alto = 52.0f;
+            camara.distancia = camara.real = camara.dist_meta = 11.0f; camara.py = 0.25f;
+            glViewport(0, 0, 960, 544);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glFrustum(-0.576f, 0.576f, -0.3264f, 0.3264f, 0.6f, 330.0f);
+            camara_aplicar(&camara, jugador.x, jugador.z);
+            cubo_activar();
+            glEnable(GL_DEPTH_TEST);
+            interior_dibujar(jugador.tiempo);
+            jugador_dibujar(&jugador);
+            cubo_desactivar();
+            ui_inicio();
+            if (hablando_i >= 0) dialogo_dibujar();
+            else {
+                int q = interior_npc_cercano(&jugador, 1.7f);
+                if (q >= 0) {
+                    char t[80]; snprintf(t, sizeof(t), "○ Hablar con %s", interior_npc_nombre(q));
+                    int w = (int)ui_ancho(t, 1);
+                    ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
+                    ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
+                }
+            }
+            if (fund > 0) ui_rect(0, 0, 960, 544, (unsigned)(fund * 255 / 14));
+            ui_fin();
+            vglSwapBuffers(GL_FALSE);
+            continue;
+        }
+
         // En el carro la cámara va fija detrás (como GTA): el stick derecho no la mueve
         camara_actualizar(&camara, en_carro >= 0 ? 0.0f : rx, en_carro >= 0 ? 0.0f : ry, en_carro >= 0 ? 0 : (nuevos & SCE_CTRL_LTRIGGER) != 0);
         npcs_actualizar(jugador.x, jugador.z);
@@ -99,6 +164,9 @@ int main(void) {
                     ax0 = jugador.x; az0 = jugador.z;
                     vehiculo_pos(n, &ax1, &az1, &a0, &v0);
                     anim = 24; anim_n = n; anim_sube = 1;
+                } else {
+                    char L = lugar_entrada_cerca(jugador.x, jugador.z, 2.5f);
+                    if (L && interior_hay(L) && fase_f == 0) { pend_l = L; pend_salir = 0; fase_f = 1; }
                 }
             }
             fx = jugador.x; fz = jugador.z;
@@ -175,8 +243,17 @@ int main(void) {
                 int w = (int)ui_ancho(t, 1);
                 ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
                 ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
+            } else if (vehiculo_cercano(jugador.x, jugador.z, 3.5f) < 0) {
+                char L = lugar_entrada_cerca(jugador.x, jugador.z, 2.5f);
+                if (L && interior_hay(L)) {
+                    char t[80]; snprintf(t, sizeof(t), "△ Entrar: %s", interior_nombre(L));
+                    int w = (int)ui_ancho(t, 1);
+                    ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
+                    ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
+                }
             }
         }
+        if (fund > 0) ui_rect(0, 0, 960, 544, (unsigned)(fund * 255 / 14));
         ui_fin();
 
         vglSwapBuffers(GL_FALSE);

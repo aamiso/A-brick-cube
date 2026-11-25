@@ -52,3 +52,5 @@ v00.68: conductor mas grande y visible dentro del carro; asientos mas bajos.
 v00.69: del conductor solo se ve la cabeza por la ventana.
 v00.70: diseno nuevo del carro (mas ancho, parabrisas azul, faros grandes, ruedas grandes).
 v00.71: carro identico a la referencia (parabrisas con asientos, faros, parrilla, parachoques).
+v00.72: INTERIORES estilo Pokemon (camara fija desde arriba): hospital, cafe, farmacia y banco. Junto a la puerta pulsa TRIANGULO para entrar; sal caminando por la alfombra marron del sur. O para hablar con la gente de adentro.
+v00.73: fondo negro dentro de los lugares.

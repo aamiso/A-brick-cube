@@ -8,6 +8,9 @@
 // Ruta donde están los modelos dentro del juego
 #ifndef RUTA_MODELOS
 #define RUTA_MODELOS "app0:data/modelos/"
+// Si el jugador está pegado a un lugar al que se puede entrar, devuelve su letra (si no, 0)
+char lugar_entrada_cerca(float x, float z, float alcance);
+
 #endif
 
 // 1 si esa letra del mapa es un lugar con modelo
@@ -36,5 +39,8 @@ float lugares_altura(float x, float z);
 // Cuántos lugares hay y datos de cada uno (para pruebas)
 int lugares_cantidad(void);
 int lugares_info(int i, char *letra, float *x, float *z);
+
+// Si el jugador está pegado a un lugar al que se puede entrar, devuelve su letra (si no, 0)
+char lugar_entrada_cerca(float x, float z, float alcance);
 
 #endif
