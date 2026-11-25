@@ -21,4 +21,6 @@ void personaje_liberar(Personaje *p);
 void personaje_dibujar(const Personaje *p, float x, float z, float angulo,
                        float vel, float fase, float tiempo, float elev);
 
+void personaje_dibujar_cabeza(const Personaje *p, float angulo, float tiempo);
+
 #endif

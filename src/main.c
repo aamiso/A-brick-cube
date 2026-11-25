@@ -115,7 +115,7 @@ int main(void) {
             camara.hombro = 0;
             camara.sin_choque = 1;
             camara.dist_meta = 8.0f;
-            camara.giro = ang;                                       // COMPLETAMENTE fija detrás del carro
+            camara.giro = 180.0f - ang;                            // justo detrás del carro (la cámara se coloca opuesta a giro)
             camara.alto = 10.0f;
             jugador.x = fx; jugador.z = fz; jugador.vel = 0.0f;
             if (nuevos & SCE_CTRL_TRIANGLE) {
@@ -162,6 +162,7 @@ int main(void) {
         vehiculos_dibujar(fx, fz);
         npcs_dibujar(fx, fz);
         if (en_carro < 0) jugador_dibujar(&jugador);
+        else { float cx2, cz2, a2, v2; vehiculo_pos(en_carro, &cx2, &cz2, &a2, &v2); jugador_dibujar_en_carro(&jugador, cx2, cz2, a2); }
         cubo_desactivar();
 
         // 3) Interfaz 2D

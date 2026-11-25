@@ -124,3 +124,14 @@ void personaje_dibujar(const Personaje *p, float x, float z, float angulo,
     glPopMatrix();
     (void)PI;
 }
+
+// Solo la cabeza (para el conductor dentro del carro): mira un poco a los lados
+void personaje_dibujar_cabeza(const Personaje *p, float angulo, float tiempo) {
+    if (!p->listo) return;
+    glPushMatrix();
+    glRotatef(angulo, 0.0f, 1.0f, 0.0f);
+    glTranslatef(0.0f, 1.2f, 0.0f);
+    glRotatef(sinf(tiempo * 0.6f) * 10.0f, 0.0f, 1.0f, 0.0f);
+    malla_dibujar(&p->cabeza);
+    glPopMatrix();
+}

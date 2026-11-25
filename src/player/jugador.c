@@ -79,3 +79,14 @@ void jugador_dibujar(const Jugador *j) {
     personaje_dibujar(&personaje, j->x, j->z, j->angulo, j->vel, j->fase, j->tiempo, j->elev - j->suelo);
     glPopMatrix();
 }
+
+// Sentado en el asiento del conductor (lado izquierdo): se ve por las ventanas
+void jugador_dibujar_en_carro(const Jugador *j, float cx, float cz, float ang) {
+    glPushMatrix();
+    glTranslatef(cx, 0.0f, cz);
+    glRotatef(ang, 0.0f, 1.0f, 0.0f);
+    glTranslatef(0.4f, 0.34f, -0.5f);
+    glScalef(0.8f, 0.8f, 0.8f);
+    personaje_dibujar_cabeza(&personaje, 0.0f, j->tiempo);
+    glPopMatrix();
+}
