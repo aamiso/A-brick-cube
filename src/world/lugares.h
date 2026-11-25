@@ -1,7 +1,7 @@
 // Los lugares con modelo voxel: casas, banco y café.
 // En el mapa se marcan con una letra que rellena un rectángulo del tamaño del modelo:
 //   H casa roja (10 x 9)      J casa azul (11 x 11)     K casa moderna (13 x 11)
-//   X banco (15 x 13)         Q café (16 x 14)
+//   X banco (15 x 13)         Q café (16 x 14)       c comisaría (28 x 18)       Y hospital (44 x 24)
 #ifndef WORLD_LUGARES_H
 #define WORLD_LUGARES_H
 

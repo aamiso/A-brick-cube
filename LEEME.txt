@@ -54,3 +54,7 @@ v00.70: diseno nuevo del carro (mas ancho, parabrisas azul, faros grandes, rueda
 v00.71: carro identico a la referencia (parabrisas con asientos, faros, parrilla, parachoques).
 v00.72: INTERIORES estilo Pokemon (camara fija desde arriba): hospital, cafe, farmacia y banco. Junto a la puerta pulsa TRIANGULO para entrar; sal caminando por la alfombra marron del sur. O para hablar con la gente de adentro.
 v00.73: fondo negro dentro de los lugares.
+v00.74: MAPA FINAL hecho a mano (tools/mapa_final.py): plaza con torre dorada al centro, hospital grande, comisaria nueva, zonas residencial/comercial/natural, parque con lago. Arreglado: los lugares con letra minuscula (centro comercial, comisaria) ahora si aparecen. Comisaria con interior.
+v00.75: calles mas angostas, mapa mas pequeno (232x232) y torre dorada el doble de grande (28x28 celdas, ~78 de alto).
+v00.76: la zona de la torre dorada ahora es un parque: cesped, senderos, avenida de entrada y muchos arboles.
+v00.77: plaza circular de piedra con bordes escalonados alrededor de la torre dorada, esquinas de pasto y prados con borde.

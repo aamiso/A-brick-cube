@@ -57,59 +57,103 @@ def suelo(v, borde=2):
     v.box(0, 0, 0, v.W, 1, v.D, 'G')
     v.box(borde, 0, borde, v.W - 2 * borde, 1, v.D - 2 * borde, 'P')
 
-# ---------------- HOSPITAL (22 x 16 celdas) ----------------
+# ---------------- HOSPITAL GRANDE (44 x 24 celdas): ala izquierda, torre central con cruz, ala con helipuerto ----------------
 def hospital():
-    v = V('hospital', 44, 32, 30, dict(P='e3d4b4', G='6bbf4a', C='efe6cf', W='ffffff', V='6f9fd8', v='4f7fc0', S='b8b2a4', k='25272c', Y='ffd23a',
-        B='2f62c9', R='d9382c', D='6b5a3c', T='8a6a42', L='3f9a3a', g='7f7f86'))
-    suelo(v)
-    def ala(x0, w, z0, d):
-        for f in range(3):
+    v = V('hospital', 88, 48, 38, dict(P='cfc9bb', G='6bbf4a', C='efe6cf', W='ffffff', V='6f9fd8', v='4f7fc0', S='b8b2a4', k='25272c', Y='ffd23a',
+        B='2f62c9', R='d9382c', D='6b5a3c', T='8a6a42', L='3f9a3a', g='7f7f86', e='e3e8ee'))
+    v.box(0, 0, 0, 88, 1, 48, 'G'); v.box(2, 0, 2, 84, 1, 44, 'P')
+    def cuerpo(x0, w, z0, d, pisos, techo=True):
+        for f in range(pisos):
             y0 = 1 + f * 7
-            v.box(x0, y0, z0, w, 2, d, 'C')                  # franja crema
-            v.box(x0, y0 + 2, z0, w, 4, d, 'V')              # ventanal
-            v.box(x0, y0 + 6, z0, w, 1, d, 'W')              # cornisa blanca
-        # divisiones de vidrio (cada 3 cubitos una línea más oscura)
-        for f in range(3):
+            v.box(x0, y0, z0, w, 2, d, 'C'); v.box(x0, y0 + 2, z0, w, 4, d, 'V'); v.box(x0, y0 + 6, z0, w, 1, d, 'W')
             for xx in range(x0 + 1, x0 + w, 3):
                 for zz in (z0, z0 + d - 1):
-                    for yy in range(1 + f * 7 + 2, 1 + f * 7 + 6): v.put(xx, yy, zz, 'v')
-        for f in range(3):
+                    for yy in range(y0 + 2, y0 + 6): v.put(xx, yy, zz, 'v')
             for zz in range(z0 + 1, z0 + d, 3):
                 for xx in (x0, x0 + w - 1):
-                    for yy in range(1 + f * 7 + 2, 1 + f * 7 + 6): v.put(xx, yy, zz, 'v')
-    ala(2, 5, 4, 20); ala(37, 5, 4, 20)       # alas (salen al frente)
-    ala(7, 30, 4, 16)                         # cuerpo central (más atrás)
-    # planta baja oscura en el centro + puerta
-    v.box(7, 1, 19, 30, 6, 1, 'W')
-    v.box(18, 1, 19, 8, 5, 1, 'k'); v.box(19, 1, 19, 6, 4, 1, 'V')   # puertas de vidrio
-    # techo
-    v.box(2, 22, 4, 5, 1, 20, 'W'); v.box(37, 22, 4, 5, 1, 20, 'W'); v.box(7, 22, 4, 30, 1, 16, 'W')
-    for (x0, w, z0, d) in ((2, 5, 4, 20), (37, 5, 4, 20), (7, 30, 4, 16)):
-        v.box(x0, 23, z0, w, 1, d, 'W')
-        v.box(x0 + 1, 23, z0 + 1, w - 2, 1, d - 2, '.')
-    v.box(8, 22, 5, 28, 1, 14, 'D')
-    # helipuerto
-    v.box(18, 23, 6, 12, 1, 12, 'k')
-    v.box(22, 23, 8, 1, 1, 8, 'W'); v.box(26, 23, 8, 1, 1, 8, 'W'); v.box(22, 23, 11, 5, 1, 1, 'W')
-    # cuarto de techo azul (como la referencia)
-    v.box(9, 23, 6, 6, 3, 6, 'k'); v.box(9, 26, 6, 6, 2, 6, 'B'); v.box(9, 24, 12, 1, 2, 1, 'R')
-    # cartel HOSPITAL
-    v.box(7, 8, 19, 30, 6, 1, 'k')
-    v.texto(7 + (30 - v.ancho_texto('HOSPITAL')) // 2, 9, 19, 'HOSPITAL', 'Y')
-    # techo de entrada con 4 columnas
-    v.box(12, 7, 20, 20, 1, 8, 'W')
-    for x in (13, 30):
-        v.box(x, 1, 26, 2, 6, 2, 'W')
-    # escalones
-    v.box(15, 1, 28, 14, 1, 2, 'S'); v.box(17, 1, 30, 10, 1, 1, 'S')
-    # cruz roja junto a la puerta
-    v.box(9, 4, 19, 3, 1, 1, 'R'); v.box(10, 3, 19, 1, 3, 1, 'R')
-    # árboles del frente
-    for x in (4, 40):
-        v.box(x, 1, 28, 1, 2, 1, 'T'); v.box(x - 1, 3, 27, 3, 2, 3, 'L')
+                    for yy in range(y0 + 2, y0 + 6): v.put(xx, yy, zz, 'v')
+        if techo:
+            yt = 1 + pisos * 7
+            v.box(x0, yt, z0, w, 1, d, 'W')
+            v.box(x0 + 1, yt, z0 + 1, w - 2, 1, d - 2, 'e')
+            v.box(x0, yt + 1, z0, w, 1, d, 'W'); v.box(x0 + 1, yt + 1, z0 + 1, w - 2, 1, d - 2, '.')   # muretes
+    cuerpo(4, 28, 8, 24, 3)                  # ala izquierda
+    cuerpo(56, 28, 8, 24, 3)                 # ala derecha
+    cuerpo(32, 24, 5, 28, 4)                 # torre central
+    # helipuerto en el techo del ala derecha
+    for z in range(0, 48):
+        for x in range(56, 84):
+            if (x - 70) ** 2 + (z - 20) ** 2 <= 81: v.put(x, 22, z, 'k')
+            if 64 <= (x - 70) ** 2 + (z - 20) ** 2 <= 81 and (x - 70) ** 2 + (z - 20) ** 2 <= 81: v.put(x, 22, z, 'Y')
+    v.box(66, 22, 16, 1, 1, 9, 'W'); v.box(74, 22, 16, 1, 1, 9, 'W'); v.box(66, 22, 20, 9, 1, 1, 'W')
+    # cuartos en los techos (azul) y tanques
+    v.box(8, 23, 12, 8, 3, 6, 'k'); v.box(8, 26, 12, 8, 2, 6, 'B'); v.box(20, 23, 12, 4, 2, 4, 'g')
+    v.box(36, 30, 9, 8, 3, 8, 'k'); v.box(36, 33, 9, 8, 2, 8, 'B'); v.box(50, 30, 9, 3, 2, 3, 'g')
+    # entrada: vestíbulo de vidrio de 2 pisos al frente de la torre
+    v.box(34, 1, 33, 20, 13, 6, 'W'); v.box(35, 2, 38, 18, 6, 1, 'V'); v.box(35, 2, 33, 18, 8, 1, 'V')
+    v.box(33, 14, 32, 22, 1, 9, 'W'); v.box(33, 15, 32, 22, 1, 9, 'e')
+    v.box(40, 1, 38, 8, 6, 1, '.')                                         # hueco de la puerta
+    v.box(40, 1, 38, 8, 1, 1, 'k'); v.box(40, 6, 38, 8, 1, 1, 'k')
+    v.box(35, 9, 38, 18, 4, 1, 'k')
+    v.texto(35 + (18 - v.ancho_texto('HOSPITAL')) // 2 + 0, 9, 39, 'HOSPITAL', 'Y') if v.ancho_texto('HOSPITAL') <= 18 else v.texto(34, 9, 39, 'HOSPITAL', 'Y')
+    # canopia frontal con columnas
+    v.box(36, 8, 39, 16, 1, 4, 'W')
+    for x in (37, 50): v.box(x, 1, 42, 2, 7, 2, 'W')
+    v.box(38, 1, 39, 12, 1, 6, 'S')
+    # cruz roja grande en la torre (frente, arriba)
+    v.box(41, 17, 32, 6, 1, 1, 'W')
+    v.box(41, 21, 32, 6, 8, 1, 'R'); v.box(38, 24, 32, 12, 2, 1, 'R'); v.box(40, 22, 32, 8, 1, 1, 'R')
+    # estacionamiento: líneas blancas y arbolitos
+    for x in range(8, 80, 5):
+        if not 32 <= x <= 56: v.box(x, 0, 38, 1, 1, 6, 'W')
+    for x in (4, 82): v.box(x, 1, 40, 1, 2, 1, 'T'); v.box(x - 1, 3, 39, 3, 2, 3, 'L')
+    # ambulancia: bloque blanco con cruz
+    v.box(12, 1, 40, 8, 3, 4, 'W'); v.box(12, 4, 40, 4, 1, 4, 'V'); v.box(15, 2, 40, 2, 2, 1, 'R'); v.box(12, 1, 40, 8, 1, 1, 'k')
+    v.saltar = lambda x, z: z >= 33
     v.guardar()
 
-# ---------------- EDIFICIO ROJO con escalera de incendios (9 x 9 celdas) ----------------
+# ---------------- COMISARIA (28 x 18 celdas) ----------------
+def comisaria():
+    # COMISARÍA (28 x 18 celdas): bloque central de 4 pisos con escudo y entrada de vidrio, dos alas de 3 pisos con garaje
+    v = V('comisaria', 56, 36, 31, dict(P='cfc9bb', G='6bbf4a', W='f2f4f8', e='d6dde8', B='2f62c9', b='1f3f8a', V='7fb4e6', v='4f86c0',
+        k='25272c', Y='ffd23a', R='d9382c', g='7f7f86', S='b8b2a4', L='3f9a3a'))
+    v.box(0, 0, 0, 56, 1, 36, 'G'); v.box(2, 0, 2, 52, 1, 32, 'P')
+    def ala(x0, w, z0, d, pisos):
+        for f in range(pisos):
+            y0 = 1 + f * 6
+            v.box(x0, y0, z0, w, 6, d, 'W'); v.box(x0, y0 + 5, z0, w, 1, d, 'e')
+            for xx in range(x0 + 2, x0 + w - 2, 4):
+                for zz in (z0, z0 + d - 1):
+                    v.box(xx, y0 + 2, zz, 2, 3, 1, 'V')
+            for zz in range(z0 + 3, z0 + d - 2, 5):
+                for xx in (x0, x0 + w - 1):
+                    v.box(xx, y0 + 2, zz, 1, 3, 2, 'V')
+        top = 1 + pisos * 6
+        v.box(x0, top, z0, w, 1, d, 'b'); v.box(x0 + 1, top + 1, z0 + 1, w - 2, 1, d - 2, 'g') if False else None
+        return top
+    t1 = ala(3, 17, 6, 24, 3); t2 = ala(36, 17, 6, 24, 3); t3 = ala(19, 18, 4, 28, 4)
+    # franja azul en el último piso de las alas y del centro
+    for x0, w, z0, d, top in ((3, 17, 6, 24, t1), (36, 17, 6, 24, t2)):
+        v.box(x0, top - 3, z0 + d - 1, w, 2, 1, 'B')
+    v.box(19, 19, 31, 18, 5, 1, 'B')
+    # escudo dorado sobre la entrada
+    for i, fila in enumerate(["YYYYYY", "YYYYYY", "YYYYYY", ".YYYY.", "..YY.."]):
+        for k, ch in enumerate(fila):
+            if ch == 'Y': v.put(25 + k, 23 - i, 32, 'Y')
+    # entrada de vidrio con marquesina y escalones
+    v.box(24, 1, 31, 8, 9, 1, 'V'); v.box(24, 1, 31, 1, 9, 1, 'W'); v.box(31, 1, 31, 1, 9, 1, 'W'); v.box(27, 1, 31, 2, 4, 1, 'k')
+    v.box(22, 10, 31, 12, 1, 4, 'b'); v.box(22, 1, 34, 1, 9, 1, 'W'); v.box(33, 1, 34, 1, 9, 1, 'W')
+    v.box(22, 1, 32, 12, 1, 3, 'S')
+    # garaje en el ala izquierda y puerta en la derecha
+    v.box(5, 1, 29, 5, 4, 1, 'g'); v.box(11, 1, 29, 5, 4, 1, 'g'); v.box(5, 5, 29, 11, 1, 1, 'Y')
+    v.box(45, 1, 29, 3, 5, 1, 'V'); v.box(44, 1, 29, 1, 5, 1, 'W'); v.box(48, 1, 29, 1, 5, 1, 'W')
+    # sirenas, antena y bandera en el techo
+    v.box(24, t3 + 1, 14, 3, 2, 3, 'R'); v.box(30, t3 + 1, 14, 3, 2, 3, 'B'); v.box(26, t3 + 1, 8, 4, 3, 4, 'g')
+    v.box(48, t1 + 1, 10, 1, 9, 1, 'g'); v.box(44, t1 + 6, 10, 4, 3, 1, 'B'); v.box(44, t1 + 8, 10, 4, 1, 1, 'R')
+    # arbustos y acera
+    for bx in (4, 14, 40, 50): v.box(bx, 1, 32, 3, 2, 2, 'L')
+    v.guardar()
+
 def ladrillo():
     random.seed(5)
     v = V('edificio_rojo', 18, 18, 38, dict(P='cfc9bb', G='6bbf4a', r='8b2a24', q='7a231e', s='a23a30', V='25324f', v='4a6a9c', k='1c1c20', m='8c9096',
@@ -157,33 +201,29 @@ def ladrillo():
     v.saltar = lambda x, z: z >= 16
     v.guardar()
 
-# ---------------- TORRE DORADA (14 x 14 celdas) ----------------
+# ---------------- TORRE DORADA (28 x 28 celdas, ~78 de alto): el diseño original a doble escala ----------------
 def torre_dorada():
-    v = V('torre_dorada', 28, 28, 78, dict(P='d9b36a', G='6bbf4a', o='e89a1c', O='f2b01e', Y='ffd92e', y='fff27a', d='b5651d', D='8c4a14', k='3a2410', g='a8761f'))
-    v.box(0, 0, 0, 28, 1, 28, 'P'); v.box(0, 0, 0, 28, 1, 2, 'G')
-    # núcleo central
-    v.box(7, 1, 7, 14, 62, 14, 'O')
-    v.box(9, 62, 9, 10, 8, 10, 'Y'); v.box(8, 70, 8, 12, 2, 12, 'o'); v.box(10, 72, 10, 8, 1, 8, 'y')
-    # contrafuertes: cuatro por lado, de distinta altura
+    K = 2
+    v = V('torre_dorada', 28 * K, 28 * K, 78 * K, dict(P='d9b36a', G='6bbf4a', o='e89a1c', O='f2b01e', Y='ffd92e', y='fff27a', d='b5651d', D='8c4a14', k='3a2410', g='a8761f'))
+    def B(x, y, z, w, h, d, c): v.box(x * K, y * K, z * K, w * K, h * K, d * K, c)
+    B(0, 0, 0, 28, 1, 28, 'P'); B(0, 0, 0, 28, 1, 2, 'G')
+    B(7, 1, 7, 14, 62, 14, 'O')                                           # núcleo
+    B(9, 62, 9, 10, 8, 10, 'Y'); B(8, 70, 8, 12, 2, 12, 'o'); B(10, 72, 10, 8, 1, 8, 'y')
+    B(12, 73, 12, 4, 5, 4, 'Y')                                           # aguja
     alt = [26, 40, 52, 34]
-    for i, x in enumerate((3, 8, 14, 20)):
-        v.box(x, 1, 3, 4, alt[i], 4, 'd'); v.box(x, 1, 21, 4, alt[(i + 2) % 4], 4, 'd')
+    for i, x in enumerate((3, 8, 14, 20)):                                # contrafuertes
+        B(x, 1, 3, 4, alt[i], 4, 'd'); B(x, 1, 21, 4, alt[(i + 2) % 4], 4, 'd')
     for i, z in enumerate((8, 14)):
-        v.box(3, 1, z, 4, alt[i + 1] - 6, 4, 'd'); v.box(21, 1, z, 4, alt[i] - 4, 4, 'd')
-    # franjas oscuras horizontales y ventanas encendidas en el núcleo
-    for y in range(6, 62, 8):
-        v.box(7, y, 7, 14, 1, 14, 'g')
+        B(3, 1, z, 4, alt[i + 1] - 6, 4, 'd'); B(21, 1, z, 4, alt[i] - 4, 4, 'd')
+    for y in range(6, 62, 8): B(7, y, 7, 14, 1, 14, 'g')                  # franjas
     for y in range(10, 60, 8):
         for x in (10, 14, 18):
-            v.box(x, y, 6, 2, 4, 1, 'k'); v.put(x, y + 3, 6, 'y')
-    # rascacielos: luz grande al frente arriba
-    v.box(9, 55, 6, 10, 5, 1, 'Y'); v.box(11, 56, 5, 6, 3, 1, 'y')
-    # puntitos luminosos en los contrafuertes
+            B(x, y, 6, 2, 4, 1, 'k'); B(x, y + 3, 6, 2, 1, 1, 'y')       # ventanas encendidas al frente
+            B(x, y, 21, 2, 4, 1, 'k')
+    B(9, 55, 6, 10, 5, 1, 'Y'); B(11, 56, 5, 6, 3, 1, 'y')               # luz grande
     for (x, y, z) in ((4, 20, 2), (9, 34, 2), (15, 46, 2), (21, 28, 2), (3, 16, 9), (24, 22, 9), (4, 30, 15)):
-        v.put(x, y, z, 'y')
-    # entrada con marquesina
-    v.box(9, 1, 6, 10, 6, 1, 'k'); v.box(8, 7, 3, 12, 1, 4, 'D'); v.box(11, 1, 6, 6, 5, 1, 'y')
-    v.box(12, 1, 2, 4, 1, 4, 'g')
+        B(x, y, z, 1, 1, 1, 'y')
+    B(9, 1, 6, 10, 6, 1, 'k'); B(8, 7, 3, 12, 1, 4, 'D'); B(11, 1, 6, 6, 5, 1, 'y'); B(12, 1, 2, 4, 1, 4, 'g')   # entrada
     v.guardar()
 
 # ---------------- FARMACIA (12 x 10 celdas) ----------------
@@ -370,5 +410,5 @@ def comercial():
 
 if __name__ == '__main__':
     os.makedirs(SAL, exist_ok=True)
-    hospital(); ladrillo(); torre_dorada(); farmacia(); hotel(); gemelas(); oficina(); colorido(); comercial()
+    hospital(); comisaria(); ladrillo(); torre_dorada(); farmacia(); hotel(); gemelas(); oficina(); colorido(); comercial()
     print('modelos listos')

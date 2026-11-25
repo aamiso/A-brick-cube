@@ -350,7 +350,8 @@ int ciudad_cargar(const char *ruta) {
 
         if (largo > MAX_ANCHO) largo = MAX_ANCHO;
         for (size_t c = 0; c < largo; c++) {
-            char t = (char)toupper((unsigned char)linea[c]);
+            char t = linea[c];
+            if (!lugar_es(t)) t = (char)toupper((unsigned char)t);      // las letras de lugares (s, c) se respetan en minúscula
             int valida = (t == '.' || t == '=' || t == 'S' || t == 'T' || t == 'P' ||
                           t == 'W' || es_edificio(t) || lugar_es(t));
             mapa[alto][c] = valida ? t : '.';
