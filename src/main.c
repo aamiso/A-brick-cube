@@ -22,6 +22,8 @@
 #include "world/vehiculos.h"
 #include "world/npcs.h"
 #include "world/escombros.h"
+#include "world/reloj.h"
+#include "ui/minimapa.h"
 #include "world/interior.h"
 #include "world/lugares.h"
 #include "ui/ui.h"
@@ -128,6 +130,8 @@ int main(void) {
         camara_actualizar(&camara, en_carro >= 0 ? 0.0f : rx, en_carro >= 0 ? 0.0f : ry, en_carro >= 0 ? 0 : (nuevos & SCE_CTRL_LTRIGGER) != 0);
         npcs_actualizar(jugador.x, jugador.z);
         escombros_actualizar();
+        reloj_actualizar();
+        vehiculos_ia(jugador.x, jugador.z, en_carro);
         vehiculos_pasivos(en_carro >= 0 ? en_carro : (anim > 0 ? anim_n : -1));
         if (en_carro < 0) camara.sin_choque = 0;
         float fx = jugador.x, fz = jugador.z;   // lo que sigue la cámara
@@ -165,7 +169,7 @@ int main(void) {
                     float a0, v0;
                     ax0 = jugador.x; az0 = jugador.z;
                     vehiculo_pos(n, &ax1, &az1, &a0, &v0);
-                    anim = 24; anim_n = n; anim_sube = 1;
+                    anim = 24; anim_n = n; anim_sube = 1; vehiculo_tomar(n);
                 } else {
                     char L = lugar_entrada_cerca(jugador.x, jugador.z, 2.5f);
                     if (L && interior_hay(L) && fase_f == 0) { pend_l = L; pend_salir = 0; fase_f = 1; }
@@ -207,7 +211,7 @@ int main(void) {
 
         // --- Dibujar ---
         glViewport(0, 0, 960, 544);
-        glClearColor(0.5f, 0.75f, 1.0f, 1.0f);
+        { float sr, sg, sb; reloj_cielo(&sr, &sg, &sb); glClearColor(sr, sg, sb, 1.0f); }
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glMatrixMode(GL_PROJECTION);
@@ -238,6 +242,11 @@ int main(void) {
 
         // 3) Interfaz 2D
         ui_inicio();
+        reloj_filtro();                                       // noche / atardecer
+        { float mx2 = fx, mz2 = fz; (void)mx2; (void)mz2;
+          minimapa_dibujar(fx, fz, en_carro >= 0 ? 0.0f : jugador.angulo, 0, 0.0f, 0.0f);
+          char hh[16]; int h = (int)reloj_hora(), mi = (int)((reloj_hora() - h) * 60.0f); snprintf(hh, sizeof(hh), "%02d:%02d", h, mi);
+          ui_rect(14, 14, 88, 30, 0x000000B4); ui_texto(22, 20, 1, hh, 0xFFFFFFFF); }
         if (hablando >= 0) dialogo_dibujar();
         else if (en_carro < 0 && anim <= 0) {
             int q = npc_cercano(jugador.x, jugador.z, 2.4f);

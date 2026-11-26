@@ -1,13 +1,15 @@
 #include "world/vehiculos.h"
 #include "world/ciudad.h"
 #include "world/escombros.h"
+#include "world/npcs.h"
 #include "engine/voxel.h"
 #include "engine/malla.h"
 #include "core/util.h"
 #include <vitaGL.h>
 #include <math.h>
 
-#define MAX_CARROS 12
+#define MAX_CARROS 24
+#define N_PARQUEADOS 12   // los primeros 12 están estacionados; el resto circula solo
 #define LADO 0.1f
 #define CW 20          // ancho en cubitos (1.8)
 #define CD 36          // largo en cubitos (4.0)
@@ -15,8 +17,10 @@
 #define VEL_MAX 0.55f  // unidades por cuadro (~33 u/s)
 #define EMPATE 2.4f    // distancia entre ejes
 
-typedef struct { float x, z, ang, vx, vz, vel, volante; int tipo; Malla malla; unsigned color; int danio; float roll, pitch; float alt, valt, wp, wr; } Carro;
+typedef struct { float x, z, ang, vx, vz, vel, volante; int tipo; Malla malla; unsigned color; int danio; float roll, pitch; float alt, valt, wp, wr;
+               int ia, meta_cd, trabado, fuera; float meta; } Carro;
 static Carro carros[MAX_CARROS];
+static void ia_crear_todos(float cx, float cz);
 static int n_carros = 0;
 
 static const unsigned int COLORES[] = { 0xd9382c, 0x2f62c9, 0x3aa655, 0xf2f2f2, 0x8a3fc0, 0xe8742a, 0x303338, 0xf2c230 };
@@ -109,9 +113,9 @@ static void armar_carro(Malla *m, unsigned int color, int tipo, int danio) {
 void vehiculos_iniciar(float cx, float cz) {
     for (int i = 0; i < n_carros; i++) malla_liberar(&carros[i].malla);
     n_carros = 0;
-    for (int radio = 4; radio < 70 && n_carros < MAX_CARROS; radio += 1) {
-        for (int f = 1; f < ciudad_alto() - 1 && n_carros < MAX_CARROS; f++) {
-            for (int c = 1; c < ciudad_ancho() - 1 && n_carros < MAX_CARROS; c++) {
+    for (int radio = 4; radio < 70 && n_carros < N_PARQUEADOS; radio += 1) {
+        for (int f = 1; f < ciudad_alto() - 1 && n_carros < N_PARQUEADOS; f++) {
+            for (int c = 1; c < ciudad_ancho() - 1 && n_carros < N_PARQUEADOS; c++) {
                 float x = ciudad_centro_x(c), z = ciudad_centro_z(f);
                 float d = fmaxf(fabsf(x - cx), fabsf(z - cz));
                 if (d < radio || d >= radio + 1) continue;
@@ -129,12 +133,13 @@ void vehiculos_iniciar(float cx, float cz) {
                 k->ang = hor ? 90.0f : 0.0f;
                 k->tipo = n_carros % 5;
                 malla_iniciar(&k->malla);
-                k->color = COLORES[(n_carros * 3) % 8]; k->danio = 0; k->roll = k->pitch = 0.0f; k->alt = k->valt = k->wp = k->wr = 0.0f;
+                k->color = COLORES[(n_carros * 3) % 8]; k->danio = 0; k->roll = k->pitch = 0.0f; k->alt = k->valt = k->wp = k->wr = 0.0f; k->ia = 0;
                 armar_carro(&k->malla, k->color, k->tipo, 0);
                 n_carros++;
             }
         }
     }
+    ia_crear_todos(cx, cz);
 }
 
 void vehiculos_dibujar(float px, float pz) {
@@ -215,7 +220,7 @@ static int choca(int n, float x, float z, float ang) {
 // Los carros que nadie maneja siguen rodando un rato y se frenan solos
 void vehiculos_pasivos(int activo) {
     for (int i = 0; i < n_carros; i++)
-        if (i != activo && (fabsf(carros[i].vx) + fabsf(carros[i].vz) > 0.003f || carros[i].alt > 0.0f)) vehiculo_manejar(i, 0.0f, 0.0f, 0.0f, 1);   // freno de mano: se detiene, nunca se va en reversa
+        if (i != activo && !carros[i].ia && (fabsf(carros[i].vx) + fabsf(carros[i].vz) > 0.003f || carros[i].alt > 0.0f)) vehiculo_manejar(i, 0.0f, 0.0f, 0.0f, 1);   // freno de mano: se detiene, nunca se va en reversa
 }
 
 static void choque_frontal(Carro *k, float v) {
@@ -327,4 +332,105 @@ void vehiculo_manejar(int n, float volante, float gas, float freno, int mano) {
 
     k->vel = v;
     k->vx = fx * v; k->vz = fz * v;
+}
+
+int vehiculos_cantidad(void) { return n_carros; }
+void vehiculo_tomar(int n) { carros[n].ia = 0; }
+
+// ---------- Tráfico con IA: circulan por su carril, giran en las esquinas y frenan si hay algo adelante ----------
+static unsigned ia_s = 4242u;
+static unsigned ia_azar(void) { ia_s = ia_s * 1664525u + 1013904223u; return ia_s >> 8; }
+
+static void ia_reubicar(Carro *k, float px, float pz, float dmin) {
+    for (int t = 0; t < 400; t++) {
+        int c = (int)(px / CIUDAD_TAM + ciudad_ancho() * 0.5f) + (int)(ia_azar() % 221) - 110;
+        int f = (int)(pz / CIUDAD_TAM + ciudad_alto() * 0.5f) + (int)(ia_azar() % 221) - 110;
+        if (c < 3 || f < 3 || c >= ciudad_ancho() - 3 || f >= ciudad_alto() - 3) continue;
+        if (ciudad_tipo_en(c, f) != '=') continue;
+        float x = ciudad_centro_x(c), z = ciudad_centro_z(f);
+        if (fmaxf(fabsf(x - px), fabsf(z - pz)) < dmin) continue;
+        int hor = ciudad_tipo_en(c - 2, f) == '=' && ciudad_tipo_en(c + 2, f) == '=';
+        int ver = ciudad_tipo_en(c, f - 2) == '=' && ciudad_tipo_en(c, f + 2) == '=';
+        if (hor == ver) continue;
+        if (ciudad_choca(x, z, 1.5f) || vehiculos_choca(x, z, 3.0f, -1)) continue;
+        k->x = x; k->z = z;
+        k->ang = hor ? ((ia_azar() & 1) ? 90.0f : 270.0f) : ((ia_azar() & 1) ? 0.0f : 180.0f);
+        k->meta = k->ang; k->vel = 0.0f; k->vx = k->vz = 0.0f; k->trabado = 0; k->meta_cd = 60;
+        return;
+    }
+}
+
+static void ia_crear_todos(float cx, float cz) {
+    while (n_carros < MAX_CARROS) {
+        Carro *k = &carros[n_carros];
+        k->x = 99999.0f; k->z = 99999.0f; k->vx = k->vz = k->vel = k->volante = 0.0f;
+        k->tipo = 0; k->color = COLORES[(n_carros * 5 + 1) % 8]; k->danio = 0; k->roll = k->pitch = 0.0f;
+        k->alt = k->valt = k->wp = k->wr = 0.0f; k->ia = 1; k->fuera = 0; k->meta_cd = 0; k->trabado = 0; k->meta = 0.0f;
+        malla_iniciar(&k->malla);
+        armar_carro(&k->malla, k->color, 0, 0);
+        n_carros++;
+        ia_reubicar(k, cx, cz, 30.0f);
+        if (k->x > 90000.0f) { k->ia = 0; }          // no hubo sitio: queda sin usar lejos
+    }
+}
+
+static float dif_ang(float a, float b) { float d = b - a; while (d > 180.0f) d -= 360.0f; while (d < -180.0f) d += 360.0f; return d; }
+static int es_calle(float x, float z) {
+    int c = (int)floorf(x / CIUDAD_TAM + ciudad_ancho() * 0.5f), f = (int)floorf(z / CIUDAD_TAM + ciudad_alto() * 0.5f);
+    return ciudad_tipo_en(c, f) == '=';
+}
+
+void vehiculos_ia(float px, float pz, int activo) {
+    for (int i = 0; i < n_carros; i++) {
+        Carro *k = &carros[i];
+        if (!k->ia || i == activo) continue;
+        if (fmaxf(fabsf(k->x - px), fabsf(k->z - pz)) > 140.0f) { ia_reubicar(k, px, pz, 45.0f); continue; }
+        if (fmaxf(fabsf(k->x - px), fabsf(k->z - pz)) > 100.0f) continue;     // lejos: congelado
+        float r = k->ang * PI / 180.0f, fx = sinf(r), fz = cosf(r);
+        float rx = -fz, rz = fx;                                              // derecha del carro
+        if (!es_calle(k->x, k->z)) { if (++k->fuera > 40) { k->fuera = 0; ia_reubicar(k, px, pz, 30.0f); continue; } } else k->fuera = 0;
+        // ¿hay algo adelante? (otro carro, una persona o el jugador)
+        int bloqueado = 0;
+        for (float d = 2.8f; d <= 6.0f && !bloqueado; d += 1.6f) {
+            float ax = k->x + fx * d, az = k->z + fz * d;
+            if (vehiculos_choca(ax, az, 0.9f, i) || npcs_choca(ax, az, 0.5f, -1)) bloqueado = 1;
+            float jx = ax - px, jz = az - pz; if (jx * jx + jz * jz < 1.6f * 1.6f) bloqueado = 1;
+        }
+        // decisión en cruces y finales de calle
+        if (k->meta_cd > 0) k->meta_cd--;
+        int c = (int)floorf(k->x / CIUDAD_TAM + ciudad_ancho() * 0.5f), f = (int)floorf(k->z / CIUDAD_TAM + ciudad_alto() * 0.5f);
+        int en_cruce = ciudad_tipo_en(c, f) == '=' && ciudad_tipo_en(c - 4, f) == '=' && ciudad_tipo_en(c + 4, f) == '=' &&
+                       ciudad_tipo_en(c, f - 4) == '=' && ciudad_tipo_en(c, f + 4) == '=';
+        if (fabsf(dif_ang(k->ang, k->meta)) < 3.0f && k->meta_cd == 0) {
+            if (en_cruce) {
+                int op = (int)(ia_azar() % 4);                                // 0,1 recto · 2 derecha · 3 izquierda
+                float m = k->ang + (op < 2 ? 0.0f : op == 2 ? 90.0f : -90.0f);
+                float mr = m * PI / 180.0f;
+                if (es_calle(k->x + sinf(mr) * 7.0f, k->z + cosf(mr) * 7.0f)) { k->meta = m; k->meta_cd = 120; }
+            } else if (!es_calle(k->x + fx * 4.0f, k->z + fz * 4.0f)) {        // se acabó la calle: da la vuelta
+                k->meta = k->ang + 180.0f; k->meta_cd = 120;
+            }
+        }
+        float giro = dif_ang(k->ang, k->meta);
+        float vt = bloqueado ? 0.0f : (fabsf(giro) > 3.0f ? 0.07f : 0.17f);
+        k->vel += (vt - k->vel) * (bloqueado ? 0.25f : 0.05f);
+        if (fabsf(giro) > 0.5f && k->vel > 0.03f) { float p = fminf(2.0f, fabsf(giro)); k->ang += giro > 0 ? p : -p; if (k->ang >= 360.0f) k->ang -= 360.0f; if (k->ang < 0.0f) k->ang += 360.0f; }
+        // mantenerse en su carril (a la derecha del centro de la calle) cuando va recto
+        if (fabsf(giro) < 3.0f && !en_cruce) {
+            int horiz = fabsf(fx) > 0.7f;
+            int n1 = 0, n2 = 0;
+            while (n1 < 8 && (horiz ? ciudad_tipo_en(c, f - n1 - 1) : ciudad_tipo_en(c - n1 - 1, f)) == '=') n1++;
+            while (n2 < 8 && (horiz ? ciudad_tipo_en(c, f + n2 + 1) : ciudad_tipo_en(c + n2 + 1, f)) == '=') n2++;
+            if (n1 + n2 + 1 <= 8) {
+                float centro = horiz ? (ciudad_centro_z(f - n1) + ciudad_centro_z(f + n2)) * 0.5f : (ciudad_centro_x(c - n1) + ciudad_centro_x(c + n2)) * 0.5f;
+                float objetivo = centro + (horiz ? rz : rx) * 1.6f, actual = horiz ? k->z : k->x, e = objetivo - actual;
+                if (e > 0.04f) e = 0.04f; if (e < -0.04f) e = -0.04f;
+                if (horiz) k->z += e; else k->x += e;
+            }
+        }
+        k->x += fx * k->vel; k->z += fz * k->vel;
+        k->vx = fx * k->vel; k->vz = fz * k->vel;
+        k->roll += (-giro * 0.12f * (k->vel / 0.17f) - k->roll) * 0.1f;
+        if (bloqueado && k->vel < 0.01f) { if (++k->trabado > 360) { k->meta = k->ang + 180.0f; k->trabado = 0; k->meta_cd = 0; } } else k->trabado = 0;
+    }
 }

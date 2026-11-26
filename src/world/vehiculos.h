@@ -25,4 +25,9 @@ void vehiculo_inclinacion(int n, float *roll, float *pitch, float *alt);
 // 1 si un carro veloz toca el círculo; da la velocidad del carro (para atropellar)
 int vehiculos_atropella(float x, float z, float radio, float *vx, float *vz);
 
+// Tráfico: carros que circulan solos (llamar cada cuadro; "activo" = el que maneja el jugador)
+void vehiculos_ia(float px, float pz, int activo);
+int  vehiculos_cantidad(void);
+void vehiculo_tomar(int n);      // el jugador se sube: deja de ser de la IA
+
 #endif
