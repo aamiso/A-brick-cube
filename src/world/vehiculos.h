@@ -19,4 +19,10 @@ void vehiculos_pasivos(int activo);
 void vehiculo_velocidad(int n, float *vx, float *vz);
 void vehiculo_pos(int n, float *x, float *z, float *angulo, float *vel);
 
+int vehiculo_danio(int n);   // 1 si ya tiene el frente roto
+// Inclinación de la carrocería (grados): roll = balanceo, pitch = cabeceo
+void vehiculo_inclinacion(int n, float *roll, float *pitch);
+// 1 si un carro veloz toca el círculo; da la velocidad del carro (para atropellar)
+int vehiculos_atropella(float x, float z, float radio, float *vx, float *vz);
+
 #endif

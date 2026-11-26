@@ -1,6 +1,7 @@
 #include "world/npcs.h"
 #include "world/ciudad.h"
 #include "world/vehiculos.h"
+#include "world/escombros.h"
 #include "player/personaje.h"
 #include "ui/dialogo.h"
 #include "core/util.h"
@@ -18,6 +19,7 @@ typedef struct {
     float dir;                  // hacia dónde camina
     int espera;                 // cuadros hasta cambiar de idea
     int caminando, hablando;
+    int muerto;                 // cuadros que faltan para que reaparezca (0 = vivo)
     int rol, variante, visitas;
     const char *nombre;
 } Npc;
@@ -106,7 +108,7 @@ void npcs_iniciar(float cx, float cz) {
 
 int npcs_choca(float x, float z, float radio, int ignorar) {
     for (int i = 0; i < n_npc; i++) {
-        if (i == ignorar) continue;
+        if (i == ignorar || npcs[i].muerto) continue;
         float dx = npcs[i].x - x, dz = npcs[i].z - z, r = RADIO_NPC + radio;
         if (dx * dx + dz * dz < r * r) return 1;
     }
@@ -120,8 +122,21 @@ static int libre(int i, float x, float z) {
 void npcs_actualizar(float px, float pz) {
     for (int i = 0; i < n_npc; i++) {
         Npc *n = &npcs[i];
+        if (n->muerto) {                                              // destruido: reaparece en su casa
+            if (--n->muerto == 0) { n->x = n->casa_x; n->z = n->casa_z; n->vel = 0.0f; n->hablando = 0; n->espera = 30; }
+            continue;
+        }
         if (fabsf(n->x - px) > 70.0f || fabsf(n->z - pz) > 70.0f) continue;
         n->tiempo += 1.0f / 60.0f;
+        { float cvx, cvz;
+          if (!n->hablando && vehiculos_atropella(n->x, n->z, RADIO_NPC, &cvx, &cvz)) {   // ¡atropellado! se hace cubitos
+            int v = n->variante;
+            escombros_crear(n->x, 0.9f, n->z, cvx * 1.4f, cvz * 1.4f, CAMISAS[v], 9, 0.22f, 0.10f);
+            escombros_crear(n->x, 0.5f, n->z, cvx * 1.4f, cvz * 1.4f, PANTALON[v], 8, 0.22f, 0.10f);
+            escombros_crear(n->x, 1.4f, n->z, cvx * 1.4f, cvz * 1.4f, PIELES[v], 5, 0.2f, 0.12f);
+            escombros_crear(n->x, 1.6f, n->z, cvx * 1.4f, cvz * 1.4f, PELOS[v], 4, 0.2f, 0.12f);
+            n->muerto = 900; continue;
+          } }
         if (vehiculos_choca(n->x, n->z, RADIO_NPC, -1)) {            // un carro lo alcanzó: sale por el lado libre
             for (int k = 0; k < 16; k++) {
                 float a = k * 0.3927f;
@@ -160,6 +175,7 @@ void npcs_actualizar(float px, float pz) {
 void npcs_dibujar(float px, float pz) {
     for (int i = 0; i < n_npc; i++) {
         const Npc *n = &npcs[i];
+        if (n->muerto) continue;
         if (fabsf(n->x - px) > 60.0f || fabsf(n->z - pz) > 60.0f) continue;
         personaje_dibujar(&var[n->variante], n->x, n->z, n->ang, n->vel, n->fase, n->tiempo, 0.0f);
     }
@@ -168,6 +184,7 @@ void npcs_dibujar(float px, float pz) {
 int npc_cercano(float x, float z, float alcance) {
     int mejor = -1; float md = alcance * alcance;
     for (int i = 0; i < n_npc; i++) {
+        if (npcs[i].muerto) continue;
         float dx = npcs[i].x - x, dz = npcs[i].z - z, d = dx * dx + dz * dz;
         if (d < md) { md = d; mejor = i; }
     }

@@ -226,6 +226,86 @@ def torre_dorada():
     B(9, 1, 6, 10, 6, 1, 'k'); B(8, 7, 3, 12, 1, 4, 'D'); B(11, 1, 6, 6, 5, 1, 'y'); B(12, 1, 2, 4, 1, 4, 'g')   # entrada
     v.guardar()
 
+# ---------------- CAFÉ (16 x 14 celdas): edificio de dos pisos con toldo, terraza, mesas, bancas y sombrillas ----------------
+def cafe():
+    v = V('cafe', 32, 28, 30, dict(G='6bbf4a', P='d8d2c4', p='eae4d4', C='f4e9d0', B='a8553a', b='8a3f2a', F='5a3a22', D='7a4a26', V='9fd6ee', A='2e7d4f', w='ffffff',
+        S='3a2410', Y='f2c230', T='b9824a', H='8a5a2a', U='d9382c', L='3a8f3a', o='c86a2a', y='ffe680', k='25272c', K='7a4a26', r='c9b99a'))
+    v.box(0, 0, 0, 32, 1, 28, 'G')
+    for z in range(2, 27):
+        for x in range(2, 30): v.put(x, 0, z, 'P' if ((x // 2 + z // 2) % 2 == 0) else 'p')
+    # ---- edificio: x 2..29, z 2..17 ----
+    X0, W0, Z0, D0 = 2, 28, 2, 16
+    v.box(X0, 1, Z0, W0, 8, D0, 'C')                                   # planta baja
+    v.box(X0, 1, Z0 + D0 - 1, W0, 2, 1, 'B')                           # zócalo de ladrillo al frente
+    v.box(X0, 1, Z0, 1, 2, D0, 'B'); v.box(X0 + W0 - 1, 1, Z0, 1, 2, D0, 'B')
+    zf = Z0 + D0 - 1                                                   # cara del frente (z = 17)
+    for x in range(X0 + 1, X0 + W0 - 1):                               # ventanales corridos
+        v.box(x, 3, zf, 1, 4, 1, 'V')
+    for x in (X0, X0 + 7, X0 + 13, X0 + 18, X0 + 21, X0 + W0 - 1):     # pilares
+        v.box(x, 1, zf, 1, 7, 1, 'F')
+    v.box(X0, 7, zf, W0, 1, 1, 'F')                                    # dintel
+    v.box(14, 1, zf, 4, 6, 1, 'D'); v.box(15, 3, zf, 2, 3, 1, 'V')     # puerta con vidrio
+    # toldo a rayas verde y blanco
+    for i, x in enumerate(range(X0, X0 + W0, 2)):
+        c = 'A' if i % 2 == 0 else 'w'
+        v.box(x, 8, zf + 1, 2, 1, 2, c); v.box(x, 7, zf + 3, 2, 1, 2, c); v.box(x, 6, zf + 5, 2, 1, 1, c)
+    # ---- piso de arriba ----
+    v.box(X0, 9, Z0, W0, 6, D0, 'C')
+    for cx in (6, 14, 22):
+        v.box(cx, 10, zf, 4, 4, 1, 'V')
+        v.box(cx - 1, 10, zf, 1, 4, 1, 'A'); v.box(cx + 4, 10, zf, 1, 4, 1, 'A')       # postigos verdes
+        v.box(cx - 1, 9, zf + 1, 6, 1, 1, 'F')                                           # alféizar
+        v.box(cx, 14, zf, 4, 1, 1, 'F')
+    for z in range(Z0 + 2, zf - 1, 4):                                                   # ventanas laterales
+        for xx in (X0, X0 + W0 - 1): v.box(xx, 10, z, 1, 4, 2, 'V')
+    v.box(12, 9, zf + 1, 8, 1, 2, 'F')                                                   # balcón
+    v.box(12, 10, zf + 2, 8, 1, 1, 'F')
+    for x in (12, 15, 19): v.box(x, 10, zf + 2, 1, 2, 1, 'F')
+    v.box(13, 10, zf + 1, 2, 2, 1, 'L'); v.box(17, 10, zf + 1, 2, 2, 1, 'L')             # macetas del balcón
+    # cornisa, techo y letrero
+    v.box(X0 - 1, 15, Z0 - 1, W0 + 2, 1, D0 + 2, 'F'); v.box(X0, 16, Z0, W0, 1, D0, 'b')
+    v.box(X0, 17, zf, W0, 1, 1, 'C'); v.box(X0, 17, Z0, W0, 1, 1, 'C'); v.box(X0, 17, Z0, 1, 1, D0, 'C'); v.box(X0 + W0 - 1, 17, Z0, 1, 1, D0, 'C')
+    v.box(7, 17, zf, 18, 7, 1, 'S'); v.box(7, 24, zf, 18, 1, 1, 'F'); v.box(7, 17, zf, 18, 1, 1, 'F')       # letrero en el techo
+    v.box(6, 17, zf, 1, 8, 1, 'F'); v.box(25, 17, zf, 1, 8, 1, 'F')
+    v.texto(8, 19, zf + 1, 'CAFE', 'Y')
+    v.box(26, 17, 4, 3, 5, 3, 'B'); v.box(25, 22, 3, 5, 1, 5, 'b')                       # chimenea
+    # taza gigante en el techo
+    v.box(4, 17, 5, 5, 3, 5, 'w'); v.box(5, 20, 6, 3, 1, 3, 'T'); v.box(9, 18, 6, 1, 2, 3, 'w'); v.box(3, 17, 4, 7, 1, 7, 'r')
+    for sx in (5, 7): v.box(sx, 21, 7, 1, 2, 1, 'w')
+    # ---- terraza: barandilla, bancas, mesas y sombrillas (z 19..26) ----
+    for x in range(2, 30):                                                               # barandilla del frente (con entrada)
+        if 13 <= x <= 18: continue
+        v.box(x, 1, 26, 1, 1, 1, 'F') if x % 4 == 0 else v.box(x, 2, 26, 1, 1, 1, 'F')
+    for x in range(2, 30, 4):
+        if not 13 <= x <= 18: v.box(x, 1, 26, 1, 3, 1, 'F')
+    for z in range(19, 26):
+        for xx in (2, 29): v.box(xx, 2, z, 1, 1, 1, 'F')
+    for z in range(20, 26, 4):
+        for xx in (2, 29): v.box(xx, 1, z, 1, 3, 1, 'F')
+    def banca(bx, bz, atras):                                  # 4 de ancho: asiento, patas y respaldo (atras = +1 / -1 hacia donde queda el respaldo)
+        v.box(bx, 2, bz, 4, 1, 1, 'H'); v.put(bx, 1, bz, 'H'); v.put(bx + 3, 1, bz, 'H')
+        v.box(bx, 3, bz + atras, 4, 2, 1, 'H')
+    def mesa(tx, tz, sombrilla):
+        v.box(tx + 1, 1, tz + 1, 1, 2, 1, 'T'); v.box(tx, 3, tz, 3, 1, 3, 'T')                 # mesa de 3x3 con pata central
+        v.put(tx + 1, 4, tz + 1, 'y')                                                           # farolito
+        banca(tx - 0, tz - 2, -1); banca(tx - 0, tz + 4, 1)                                     # bancas a los lados (respaldo hacia afuera)
+        if sombrilla:
+            v.box(tx + 1, 4, tz + 1, 1, 6, 1, 'F')
+            for i in range(7):
+                for j in range(7):
+                    cx, cz = i - 3, j - 3
+                    d = abs(cx) + abs(cz)
+                    if d <= 4: v.put(tx + 1 + cx, 10 if d > 1 else 11, tz + 1 + cz, 'U' if (i + j) % 2 == 0 else 'w')
+    mesa(4, 21, True); mesa(25, 21, True); mesa(11, 22, False); mesa(18, 22, False)
+    # bancas pegadas a la pared y macetas
+    for mx in (9, 22):
+        v.box(mx, 1, 18, 2, 2, 1, 'o'); v.box(mx, 3, 18, 2, 3, 1, 'L')
+    # faroles en las esquinas de la terraza
+    for (lx, lz) in ((3, 25), (28, 25)):
+        v.box(lx, 1, lz, 1, 6, 1, 'k'); v.box(lx - 1, 7, lz - 1, 3, 1, 3, 'y')
+    v.box(14, 0, 26, 4, 1, 3, 'p'); v.box(15, 0, 27, 2, 1, 1, 'P')                         # camino de entrada
+    v.guardar()
+
 # ---------------- FARMACIA (12 x 10 celdas) ----------------
 def farmacia():
     v = V('farmacia', 24, 20, 20, dict(P='e3d4b4', G='6bbf4a', W='ffffff', w='e8f0ee', V='a9e0f0', v='7cc6dc', g='2fa86a', h='1f7a4d', k='25272c', R='d9382c', Y='fff6b0', L='3f9a3a', T='6b4a2f'))
@@ -410,5 +490,5 @@ def comercial():
 
 if __name__ == '__main__':
     os.makedirs(SAL, exist_ok=True)
-    hospital(); comisaria(); ladrillo(); torre_dorada(); farmacia(); hotel(); gemelas(); oficina(); colorido(); comercial()
+    hospital(); cafe(); comisaria(); ladrillo(); torre_dorada(); farmacia(); hotel(); gemelas(); oficina(); colorido(); comercial()
     print('modelos listos')

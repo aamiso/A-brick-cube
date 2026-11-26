@@ -404,6 +404,12 @@ static int cara_lado(const Voxeles *v, int x, int y, int z) {
     return 0;
 }
 
+// Huecos que dejan los choques en los edificios
+#define MAX_HUECOS 64
+typedef struct { float x, y, z, r; } Hueco;
+static Hueco huecos[MAX_HUECOS];
+static int n_huecos = 0;
+
 static void armar_fachada(Malla *m, const Bloque *b, const TipoEdificio *e) {
     float lado = (e->h >= 14.0f) ? 1.0f : 0.5f;
     int vidrio = (e->letra == 'E');
@@ -498,6 +504,17 @@ static void armar_fachada(Malla *m, const Bloque *b, const TipoEdificio *e) {
         voxel_caja(&v, dx - 1, dh, zf + 1, dw + 2, 1, 1, 'n');
     }
 
+    for (int h = 0; h < n_huecos; h++) {                 // cubitos que se llevó un choque
+        const Hueco *q = &huecos[h];
+        if (fabsf(q->x - b->x) > b->w * 0.5f + 1.0f || fabsf(q->z - b->z) > b->d * 0.5f + 1.0f) continue;
+        for (int y = 0; y < v.H; y++)
+            for (int z = 0; z < v.D; z++)
+                for (int x = 0; x < v.W; x++) {
+                    float wx = b->x + (x + 0.5f - v.W * 0.5f) * lado, wz = b->z + (z + 0.5f - v.D * 0.5f) * lado, wy = (y + 0.5f) * lado;
+                    float dx = wx - q->x, dy = wy - q->y, dz = wz - q->z;
+                    if (dx * dx + dy * dy + dz * dz < q->r * q->r) voxel_poner(&v, x, y, z, '.');
+                }
+    }
     Malla tmp;
     malla_iniciar(&tmp);
     voxel_malla(&v, lado, v.W * 0.5f, 0.0f, v.D * 0.5f, &tmp);
@@ -573,6 +590,24 @@ void ciudad_dibujar(float px, float pz, float giro) {
         }
     }
     lugares_dibujar(px, pz);
+}
+
+// Un choque fuerte arranca un pedazo del edificio que está en (x,z). Devuelve 1 y su color si había uno.
+int ciudad_destruir(float x, float y, float z, float r, unsigned *color) {
+    for (int i = 0; i < n_bloques; i++) {
+        const Bloque *b = &bloques[i];
+        if (fabsf(x - b->x) > b->w * 0.5f + 0.5f || fabsf(z - b->z) > b->d * 0.5f + 0.5f) continue;
+        const TipoEdificio *e = edificio_de(b->tipo);
+        if (e == NULL || y > e->h) return 0;
+        if (n_huecos >= MAX_HUECOS) return 0;
+        huecos[n_huecos++] = (Hueco){ x, y, z, r };
+        *color = rgb_de(e->r, e->g, e->b);
+        int c = (int)floorf(b->x / CIUDAD_TAM + ancho * 0.5f) / GCH;
+        int f = (int)floorf(b->z / CIUDAD_TAM + alto * 0.5f) / GCH;
+        if (grupos[f][c].listo) { malla_liberar(&grupos[f][c].m); grupos[f][c].listo = 0; }
+        return 1;
+    }
+    return 0;
 }
 
 // ---------- Colisiones ----------

@@ -34,6 +34,9 @@ int ciudad_choca_y(float x, float z, float radio, float y);
 float ciudad_piso(float x, float z, float radio, float y);
 
 // Qué letra hay en la celda (col, fila). Fuera del mapa devuelve '.'.
+// Arranca un pedazo de edificio (esfera de radio r en x,y,z). 1 si había edificio; color = su color
+int ciudad_destruir(float x, float y, float z, float r, unsigned *color);
+
 char ciudad_tipo_en(int col, int fila);
 // Centro de una celda en el mundo
 float ciudad_centro_x(int col);

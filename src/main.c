@@ -21,6 +21,7 @@
 #include "world/terreno.h"
 #include "world/vehiculos.h"
 #include "world/npcs.h"
+#include "world/escombros.h"
 #include "world/interior.h"
 #include "world/lugares.h"
 #include "ui/ui.h"
@@ -126,6 +127,7 @@ int main(void) {
         // En el carro la cámara va fija detrás (como GTA): el stick derecho no la mueve
         camara_actualizar(&camara, en_carro >= 0 ? 0.0f : rx, en_carro >= 0 ? 0.0f : ry, en_carro >= 0 ? 0 : (nuevos & SCE_CTRL_LTRIGGER) != 0);
         npcs_actualizar(jugador.x, jugador.z);
+        escombros_actualizar();
         vehiculos_pasivos(en_carro >= 0 ? en_carro : (anim > 0 ? anim_n : -1));
         if (en_carro < 0) camara.sin_choque = 0;
         float fx = jugador.x, fz = jugador.z;   // lo que sigue la cámara
@@ -229,8 +231,9 @@ int main(void) {
         frontera_dibujar(fx, fz);
         vehiculos_dibujar(fx, fz);
         npcs_dibujar(fx, fz);
+        escombros_dibujar(fx, fz);
         if (en_carro < 0) jugador_dibujar(&jugador);
-        else { float cx2, cz2, a2, v2; vehiculo_pos(en_carro, &cx2, &cz2, &a2, &v2); jugador_dibujar_en_carro(&jugador, cx2, cz2, a2); }
+        else { float cx2, cz2, a2, v2; vehiculo_pos(en_carro, &cx2, &cz2, &a2, &v2); float rl, pt; vehiculo_inclinacion(en_carro, &rl, &pt); jugador_dibujar_en_carro(&jugador, cx2, cz2, a2, rl, pt); }
         cubo_desactivar();
 
         // 3) Interfaz 2D

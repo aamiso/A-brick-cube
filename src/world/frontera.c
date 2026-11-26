@@ -4,8 +4,8 @@
 #include "engine/malla.h"
 #include <math.h>
 
-#define PLAYA   6.0f    // franja de arena afuera del mapa
-#define MAR     80.0f   // ancho del mar
+#define PLAYA   0.0f    // franja de arena afuera del mapa
+#define MAR     0.0f   // ancho del mar
 #define LOSA    20.0f   // tamaño de cada cuadro de mar/arena
 
 static Malla suelo_m, alto_m, valla_m;
@@ -70,8 +70,8 @@ static void armar_alto(void) {
     float mx = ciudad_ancho() * CIUDAD_TAM * 0.5f;
     float mz = ciudad_alto()  * CIUDAD_TAM * 0.5f;
 
-    // Valla roja y blanca justo afuera del mapa
     int n = 0;
+    if (0) {
     for (float x = -mx; x < mx; x += 4.0f, n++) {
         float len = fminf(4.0f, mx - x), cx = x + len * 0.5f;
         float r = (n & 1) ? 0.95f : 0.85f, g = (n & 1) ? 0.95f : 0.15f, b = (n & 1) ? 0.95f : 0.15f;
@@ -85,15 +85,16 @@ static void armar_alto(void) {
         malla_caja(&valla_m, -mx - 0.6f, 0.6f, cz, 0.5f, 1.2f, len, r, g, b);
         malla_caja(&valla_m,  mx + 0.6f, 0.6f, cz, 0.5f, 1.2f, len, r, g, b);
     }
+    }
 
     // Montañas al otro lado del mar, rodeando todo
-    float dx = mx + PLAYA + MAR + 18.0f, dz = mz + PLAYA + MAR + 18.0f;
+    float dx = mx + 40.0f, dz = mz + 40.0f;
     unsigned s = 0;
-    for (float x = -dx; x <= dx; x += 26.0f, s++) {
+    for (float x = -dx; x <= dx && 0; x += 26.0f, s++) {
         montana(x, -dz, s);
         montana(x,  dz, s + 1000);
     }
-    for (float z = -dz + 26.0f; z < dz; z += 26.0f, s++) {
+    for (float z = -dz + 26.0f; z < dz && 0; z += 26.0f, s++) {
         montana(-dx, z, s + 2000);
         montana( dx, z, s + 3000);
     }
@@ -105,7 +106,7 @@ static void preparar(void) {
     }
     if (listo) return;
     malla_iniciar(&suelo_m); malla_iniciar(&alto_m); malla_iniciar(&valla_m);
-    armar_suelo(); armar_alto();
+    armar_alto();
     malla_tapa(&suelo_m, 0.0f, -0.3f, 0.0f, 3000.0f, 3000.0f, 0.30f, 0.62f, 0.25f);
     malla_subir(&suelo_m); malla_subir(&alto_m); malla_subir(&valla_m);
     listo = 1; w_ant = ciudad_ancho(); h_ant = ciudad_alto();
@@ -122,5 +123,5 @@ void frontera_dibujar(float px, float pz) {
     malla_dibujar(&alto_m);
     // la valla solo se ve cerca del borde del mapa
     float mx = ciudad_ancho() * CIUDAD_TAM * 0.5f, mz = ciudad_alto() * CIUDAD_TAM * 0.5f;
-    if (fabsf(px) > mx - 90.0f || fabsf(pz) > mz - 90.0f) malla_dibujar(&valla_m);
+    (void)mx; (void)mz; (void)px; (void)pz;
 }

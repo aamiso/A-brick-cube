@@ -25,8 +25,8 @@ def arboles(x0, z0, w, d, dens):
 # ---- calles estrechas: 1 acera + 6 asfalto + 1 acera ----
 LIN = [4, 76, 148, 220]
 for p in LIN:
-    rect(p, 3, 8, N - 6, 'S'); rect(p + 1, 3, 6, N - 6, '=')
-    rect(3, p, N - 6, 8, 'S'); rect(3, p + 1, N - 6, 6, '=')
+    rect(p, 4, 8, N - 8, 'S'); rect(p + 1, 4, 6, N - 8, '=')
+    rect(4, p, N - 8, 8, 'S'); rect(4, p + 1, N - 8, 6, '=')
 for a in LIN:
     for b in LIN:
         rect(a, b, 8, 8, 'S'); rect(a + 1, b, 6, 8, '='); rect(a, b + 1, 8, 6, '=')
@@ -103,6 +103,18 @@ arboles(C3, 156, 64, 64, 0.04)
 for z in range(N):
     for x in range(N):
         if m[z][x] == '.' and (x < 5 or z < 5 or x > N - 6 or z > N - 6) and random.random() < 0.25: m[z][x] = 'T'
-# ningún árbol encima de un lugar ni la P
-print("# A Brick Cube - MAPA FINAL %dx%d" % (N, N))
-for row in m: print(''.join(row))
+# ---- bosque alrededor: la ciudad es un gran cuadrado y el límite del mapa es un bosque cerrado ----
+M = 10
+N2 = N + 2 * M
+big = [['.'] * N2 for _ in range(N2)]
+for z in range(N2):
+    for x in range(N2):
+        d = min(x, z, N2 - 1 - x, N2 - 1 - z)           # distancia al borde del mapa
+        if d < 3 or (d < M and random.random() < 0.5): big[z][x] = 'T'     # pared de árboles al final y bosque más suelto hacia la ciudad
+for z in range(N):
+    for x in range(N):
+        ch = m[z][x]
+        if ch == '.' and (x < 4 or z < 4 or x > N - 5 or z > N - 5): ch = 'T' if random.random() < 0.5 else '.'
+        big[z + M][x + M] = ch
+print("# A Brick Cube - MAPA FINAL %dx%d (ciudad cuadrada + bosque)" % (N2, N2))
+for row in big: print(''.join(row))
