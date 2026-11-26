@@ -141,7 +141,7 @@ int main(void) {
             jugador.elev = sinf(3.14159265f * k) * 0.55f;
             jugador.angulo = atan2f(ax1 - ax0, az1 - az0) * 57.29578f;
             jugador.vel = 0.6f; jugador.fase += 0.3f; jugador.tiempo += 1.0f / 60.0f;
-            if (anim_n >= 0) vehiculo_manejar(anim_n, 0.0f, 0.0f, 1.0f, 0);
+            if (anim_n >= 0) vehiculo_manejar(anim_n, 0.0f, 0.0f, 0.0f, 1);   // freno de mano (antes se iba en reversa)
             fx = jugador.x; fz = jugador.z;
             if (anim == 0) {
                 jugador.elev = 0.0f; jugador.vel = 0.0f;
@@ -233,7 +233,7 @@ int main(void) {
         npcs_dibujar(fx, fz);
         escombros_dibujar(fx, fz);
         if (en_carro < 0) jugador_dibujar(&jugador);
-        else { float cx2, cz2, a2, v2; vehiculo_pos(en_carro, &cx2, &cz2, &a2, &v2); float rl, pt; vehiculo_inclinacion(en_carro, &rl, &pt); jugador_dibujar_en_carro(&jugador, cx2, cz2, a2, rl, pt); }
+        else { float cx2, cz2, a2, v2; vehiculo_pos(en_carro, &cx2, &cz2, &a2, &v2); float rl, pt, al; vehiculo_inclinacion(en_carro, &rl, &pt, &al); jugador_dibujar_en_carro(&jugador, cx2, cz2, a2, rl, pt, al); }
         cubo_desactivar();
 
         // 3) Interfaz 2D

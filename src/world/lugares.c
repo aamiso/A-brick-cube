@@ -94,10 +94,15 @@ void lugares_cargar_modelos(void) {
                         sr += (rgb >> 16) & 255; sg += (rgb >> 8) & 255; sb += rgb & 255; cuenta++;
                     }
                 }
+                // Alto sólido: desde la capa 2 (o 3) hacia arriba sin huecos. Así también cuentan los escalones y bordes bajos.
+                int ini = voxel_hay(vx, x, 1, z) ? 1 : (voxel_hay(vx, x, CAPA_PARED, z) ? CAPA_PARED : -1);
+                int sol_top = 0;
+                if (ini >= 0) { sol_top = ini; while (voxel_hay(vx, x, sol_top + 1, z)) sol_top++; }
                 float h = (top > 0) ? top * LADO : 0.0f;
+                if (ini >= 0) h = sol_top * LADO;                           // lo que se pisa o choca (sin techos flotantes)
                 t->altura[z * vx->W + x] = h;
                 if (h > t->alto_max) t->alto_max = h;
-                if (voxel_hay(vx, x, CAPA_PARED, z)) t->solido[z * vx->W + x] = 1;
+                if (ini >= 0) t->solido[z * vx->W + x] = 1;
             }
         }
         if (cuenta > 0) { t->r = (float)(sr / cuenta / 255.0); t->g = (float)(sg / cuenta / 255.0); t->b = (float)(sb / cuenta / 255.0); }

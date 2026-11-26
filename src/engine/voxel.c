@@ -134,22 +134,23 @@ int voxel_cargar(Voxeles *vx, const char *ruta) {
 // ---------- Armar la malla ----------
 
 typedef struct { int n[3]; float b; float v[4][3]; } Cara;
-static const Cara CARAS[5] = {
+static const Cara CARAS[6] = {
     {{0, 1, 0},  BRILLO_ARRIBA, {{0,1,0},{1,1,0},{1,1,1},{0,1,1}}},
     {{0, 0, 1},  BRILLO_FRENTE, {{0,0,1},{1,0,1},{1,1,1},{0,1,1}}},
     {{0, 0, -1}, BRILLO_ATRAS,  {{0,0,0},{1,0,0},{1,1,0},{0,1,0}}},
     {{1, 0, 0},  BRILLO_DER,    {{1,0,0},{1,0,1},{1,1,1},{1,1,0}}},
     {{-1, 0, 0}, BRILLO_IZQ,    {{0,0,0},{0,0,1},{0,1,1},{0,1,0}}},
+    {{0, -1, 0}, 0.60f,         {{0,0,0},{0,0,1},{1,0,1},{1,0,0}}},   // cara de abajo (se ve bajo voladizos y balcones)
 };
 
 // Une las caras vecinas del mismo color en rectángulos grandes (mucho menos triángulos).
 void voxel_malla(const Voxeles *vx, float lado, float ox, float oy, float oz, Malla *m) {
     const int dim[3] = { vx->W, vx->H, vx->D };
     const float org[3] = { ox, oy, oz };
-    static const int SA[5] = { 1, 2, 2, 0, 0 }, UA[5] = { 0, 0, 0, 2, 2 }, VA[5] = { 2, 1, 1, 1, 1 };
+    static const int SA[6] = { 1, 2, 2, 0, 0, 1 }, UA[6] = { 0, 0, 0, 2, 2, 0 }, VA[6] = { 2, 1, 1, 1, 1, 2 };
     unsigned char *mask = (unsigned char *)malloc((size_t)(vx->W > vx->D ? vx->W : vx->D) * (vx->H > vx->D ? vx->H : vx->D) * 2 + 16);
     if (!mask) return;
-    for (int f = 0; f < 5; f++) {
+    for (int f = 0; f < 6; f++) {
         const Cara *c = &CARAS[f];
         int sa = SA[f], ua = UA[f], va = VA[f];
         int nu = dim[ua], nv = dim[va];

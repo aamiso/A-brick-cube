@@ -88,13 +88,13 @@ static void armar_alto(void) {
     }
 
     // Montañas al otro lado del mar, rodeando todo
-    float dx = mx + 40.0f, dz = mz + 40.0f;
+    float dx = mx + 70.0f, dz = mz + 70.0f;
     unsigned s = 0;
-    for (float x = -dx; x <= dx && 0; x += 26.0f, s++) {
+    for (float x = -dx; x <= dx; x += 26.0f, s++) {
         montana(x, -dz, s);
         montana(x,  dz, s + 1000);
     }
-    for (float z = -dz + 26.0f; z < dz && 0; z += 26.0f, s++) {
+    for (float z = -dz + 26.0f; z < dz; z += 26.0f, s++) {
         montana(-dx, z, s + 2000);
         montana( dx, z, s + 3000);
     }

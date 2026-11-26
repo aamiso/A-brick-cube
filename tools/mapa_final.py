@@ -116,5 +116,14 @@ for z in range(N):
         ch = m[z][x]
         if ch == '.' and (x < 4 or z < 4 or x > N - 5 or z > N - 5): ch = 'T' if random.random() < 0.5 else '.'
         big[z + M][x + M] = ch
+# ---- menos árboles: pared de 2 al borde, bosque suelto hacia la ciudad y pocos árboles dentro ----
+rr = random.Random(99)
+for z in range(N2):
+    for x in range(N2):
+        if big[z][x] != 'T': continue
+        d = min(x, z, N2 - 1 - x, N2 - 1 - z)
+        if d < 2: continue
+        keep = 0.30 if d < M else 0.30
+        if rr.random() > keep: big[z][x] = '.'
 print("# A Brick Cube - MAPA FINAL %dx%d (ciudad cuadrada + bosque)" % (N2, N2))
 for row in big: print(''.join(row))

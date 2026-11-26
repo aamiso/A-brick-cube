@@ -20,6 +20,6 @@ void jugador_iniciar(Jugador *j);
 void jugador_actualizar(Jugador *j, float lx, float ly, float giro_camara, int correr, int saltar);
 
 void jugador_dibujar(const Jugador *j);
-void jugador_dibujar_en_carro(const Jugador *j, float cx, float cz, float ang, float roll, float pitch);
+void jugador_dibujar_en_carro(const Jugador *j, float cx, float cz, float ang, float roll, float pitch, float alt);
 
 #endif

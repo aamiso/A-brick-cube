@@ -63,3 +63,5 @@ v00.78: la ciudad es un gran cuadrado (las calles ya no siguen) y el limite del 
 v0.79: Destrucción: atropellas NPCs (se hacen cubitos y reaparecen), el carro se inclina al girar/frenar, a toda velocidad el choque rompe el frente del carro y arranca un pedazo del edificio.
 
 v0.80: Pack nuevo de 15 edificios hechos desde cero con paleta fija (tools/edificios.py + tools/lib.py).
+
+v0.81: Arreglado carro en reversa al bajarse; escalones bajos sólidos; cara inferior en cubitos; montañas al fondo; 55% menos árboles (menos memoria/FPS); choque levanta el carro y a gran velocidad da una vuelta.

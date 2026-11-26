@@ -15,7 +15,7 @@
 #define VEL_MAX 0.55f  // unidades por cuadro (~33 u/s)
 #define EMPATE 2.4f    // distancia entre ejes
 
-typedef struct { float x, z, ang, vx, vz, vel, volante; int tipo; Malla malla; unsigned color; int danio; float roll, pitch; } Carro;
+typedef struct { float x, z, ang, vx, vz, vel, volante; int tipo; Malla malla; unsigned color; int danio; float roll, pitch; float alt, valt, wp, wr; } Carro;
 static Carro carros[MAX_CARROS];
 static int n_carros = 0;
 
@@ -129,7 +129,7 @@ void vehiculos_iniciar(float cx, float cz) {
                 k->ang = hor ? 90.0f : 0.0f;
                 k->tipo = n_carros % 5;
                 malla_iniciar(&k->malla);
-                k->color = COLORES[(n_carros * 3) % 8]; k->danio = 0; k->roll = k->pitch = 0.0f;
+                k->color = COLORES[(n_carros * 3) % 8]; k->danio = 0; k->roll = k->pitch = 0.0f; k->alt = k->valt = k->wp = k->wr = 0.0f;
                 armar_carro(&k->malla, k->color, k->tipo, 0);
                 n_carros++;
             }
@@ -143,9 +143,12 @@ void vehiculos_dibujar(float px, float pz) {
         if (fabsf(k->x - px) > 90.0f || fabsf(k->z - pz) > 90.0f) continue;
         glPushMatrix();
         glTranslatef(k->x, 0.0f, k->z);
+        glTranslatef(0.0f, k->alt, 0.0f);                // en el aire cuando sale volando
         glRotatef(k->ang, 0.0f, 1.0f, 0.0f);
-        glRotatef(k->pitch, 1.0f, 0.0f, 0.0f);          // suspensión: cabeceo y balanceo
+        glTranslatef(0.0f, 0.9f, 0.0f);                  // gira alrededor del centro del carro
+        glRotatef(k->pitch, 1.0f, 0.0f, 0.0f);          // suspensión: cabeceo y balanceo (y volteretas)
         glRotatef(k->roll, 0.0f, 0.0f, 1.0f);
+        glTranslatef(0.0f, -0.9f, 0.0f);
         malla_dibujar(&k->malla);
         glPopMatrix();
     }
@@ -170,7 +173,7 @@ void vehiculo_velocidad(int n, float *vx, float *vz) { *vx = carros[n].vx; *vz =
 #define RAD 0.9f
 
 int vehiculo_danio(int n) { return carros[n].danio; }
-void vehiculo_inclinacion(int n, float *roll, float *pitch) { *roll = carros[n].roll; *pitch = carros[n].pitch; }
+void vehiculo_inclinacion(int n, float *roll, float *pitch, float *alt) { *roll = carros[n].roll; *pitch = carros[n].pitch; *alt = carros[n].alt; }
 
 // 1 si un carro que va rápido toca el círculo (y da su velocidad): así se atropella
 int vehiculos_atropella(float x, float z, float radio, float *vx, float *vz) {
@@ -212,7 +215,7 @@ static int choca(int n, float x, float z, float ang) {
 // Los carros que nadie maneja siguen rodando un rato y se frenan solos
 void vehiculos_pasivos(int activo) {
     for (int i = 0; i < n_carros; i++)
-        if (i != activo && (fabsf(carros[i].vx) + fabsf(carros[i].vz) > 0.003f)) vehiculo_manejar(i, 0.0f, 0.0f, 0.25f, 0);
+        if (i != activo && (fabsf(carros[i].vx) + fabsf(carros[i].vz) > 0.003f || carros[i].alt > 0.0f)) vehiculo_manejar(i, 0.0f, 0.0f, 0.0f, 1);   // freno de mano: se detiene, nunca se va en reversa
 }
 
 static void choque_frontal(Carro *k, float v) {
@@ -224,6 +227,15 @@ static void choque_frontal(Carro *k, float v) {
     unsigned col;
     if (ciudad_destruir(px + fx * 0.8f, 1.0f, pz + fz * 0.8f, 1.4f, &col))
         escombros_crear(px + fx * 0.8f, 1.2f, pz + fz * 0.8f, fx * v * 0.5f, fz * v * 0.5f, col, 26, 0.3f, 0.14f);
+    if (v >= 0.38f) {                                              // el choque levanta el carro; muy rápido: da una vuelta completa
+        k->alt = 0.001f;
+        if (v < 0.48f) { k->valt = 0.12f; k->pitch = -20.0f; k->wp = 0.8f; k->wr = 0.0f; }
+        else {
+            k->valt = 0.20f + (v - 0.48f) * 1.6f;
+            float T = 2.0f * k->valt / 0.012f;
+            k->wp = -360.0f / T; k->wr = (v >= 0.52f) ? 360.0f / T : 0.0f;
+        }
+    }
     if (!k->danio) {                                               // se arma la versión destrozada
         k->danio = 1;
         malla_liberar(&k->malla); malla_iniciar(&k->malla);
@@ -231,11 +243,34 @@ static void choque_frontal(Carro *k, float v) {
     }
 }
 
+// Carro en el aire (después de un choque fuerte): sin control, cae con la gravedad
+static void en_el_aire(int n, Carro *k) {
+    float v = k->vel;
+    k->valt -= 0.012f; k->alt += k->valt; k->pitch += k->wp; k->roll += k->wr;
+    float r = k->ang * PI / 180.0f, fx = sinf(r), fz = cosf(r);
+    float nx = k->x + fx * v, nz = k->z + fz * v;
+    if (!choca(n, nx, nz, k->ang)) { k->x = nx; k->z = nz; } else v *= 0.3f;
+    v *= 0.995f;
+    if (k->alt <= 0.0f) {
+        k->alt = 0.0f;
+        if (k->valt < -0.07f) {                                    // rebota un poco al caer
+            k->valt = -k->valt * 0.28f; k->alt = 0.001f; k->wp *= 0.3f; k->wr *= 0.3f; v *= 0.7f;
+            escombros_crear(k->x, 0.3f, k->z, 0.0f, 0.0f, 0x909090, 6, 0.15f, 0.08f);
+        } else {
+            k->valt = 0.0f; k->wp = k->wr = 0.0f;
+            k->pitch = fmodf(k->pitch, 360.0f); if (k->pitch > 180.0f) k->pitch -= 360.0f; if (k->pitch < -180.0f) k->pitch += 360.0f;
+            k->roll = fmodf(k->roll, 360.0f); if (k->roll > 180.0f) k->roll -= 360.0f; if (k->roll < -180.0f) k->roll += 360.0f;
+        }
+    }
+    k->vel = v; k->vx = fx * v; k->vz = fz * v;
+}
+
 // Manejo nuevo (arcade simple y predecible): el carro SIEMPRE avanza hacia donde apunta.
 //  gas/freno cambian la rapidez; el volante gira el carro según la rapidez; sin deslizamiento lateral.
 //  mano = freno de mano: frena fuerte y gira más cerrado.
 void vehiculo_manejar(int n, float volante, float gas, float freno, int mano) {
     Carro *k = &carros[n];
+    if (k->alt > 0.0f) { en_el_aire(n, k); return; }
     float v = k->vel;                                   // rapidez con signo (+ adelante)
     const float REV_MAX = VEL_MAX * 0.3f;
 
@@ -270,7 +305,11 @@ void vehiculo_manejar(int n, float volante, float gas, float freno, int mano) {
 
     float r = k->ang * PI / 180.0f, fx = sinf(r), fz = cosf(r);
     float nx = k->x + fx * v, nz = k->z + fz * v;
-    if (v > 0.38f && choca(n, nx, nz, k->ang)) { choque_frontal(k, v); v *= 0.4f; nx = k->x + fx * v; nz = k->z + fz * v; }   // ¡a toda velocidad! se rompe el frente
+    if (v > 0.38f && choca(n, nx, nz, k->ang)) {
+        choque_frontal(k, v);
+        v = (k->alt > 0.0f && v >= 0.48f) ? -0.08f : v * 0.4f;     // la vuelta completa lo manda hacia atrás
+        nx = k->x + fx * v; nz = k->z + fz * v;
+    }   // ¡a toda velocidad! se rompe el frente
     if (!choca(n, nx, nz, k->ang)) { k->x = nx; k->z = nz; }
     else if (!choca(n, nx, k->z, k->ang)) k->x = nx, v *= 0.6f;      // roza una pared: se desliza
     else if (!choca(n, k->x, nz, k->ang)) k->z = nz, v *= 0.6f;
