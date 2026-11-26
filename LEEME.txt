@@ -61,3 +61,5 @@ v00.77: plaza circular de piedra con bordes escalonados alrededor de la torre do
 v00.78: la ciudad es un gran cuadrado (las calles ya no siguen) y el limite del mapa es un bosque de arboles (adios valla roja y blanca, mar y arena).
 
 v0.79: Destrucción: atropellas NPCs (se hacen cubitos y reaparecen), el carro se inclina al girar/frenar, a toda velocidad el choque rompe el frente del carro y arranca un pedazo del edificio.
+
+v0.80: Pack nuevo de 15 edificios hechos desde cero con paleta fija (tools/edificios.py + tools/lib.py).
