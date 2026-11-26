@@ -26,7 +26,7 @@ jobs:
       - name: Instalar vitaGL (el 3D)
         run: |
           git clone https://github.com/Rinnegatamante/vitaGL
-          git -C vitaGL checkout 9da8357
+          git -C vitaGL checkout 788c61d
           make -C vitaGL HAVE_SHARK=1 NO_DEBUG=1 install
 
       - name: Compilar el juego
