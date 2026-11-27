@@ -21,11 +21,18 @@ jobs:
       - name: Compilar .3dsx
         run: |
           export PATH="$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH"
+          echo "=== Archivos en 3ds/source ==="
+          ls -la 3ds/source || true
           cd 3ds
           make -j$(nproc)
+          echo "=== Archivos .3dsx encontrados ==="
+          find .. -name "*.3dsx" -ls
 
       - name: Subir artefacto 3DS
         uses: actions/upload-artifact@v4
         with:
           name: A-brick-cube-3ds
-          path: 3ds/A-brick-cube-3ds.3dsx
+          path: |
+            3ds/A-brick-cube-3ds.3dsx
+            3ds/build/*.3dsx
+          if-no-files-found: error
