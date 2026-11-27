@@ -20,6 +20,9 @@ static int u_projection, u_modelView;
 static char map_grid[MAP_MAX][MAP_MAX];
 static int map_width, map_height, player_x, player_y;
 static float angle_x = 0.82f, angle_y = 0.35f;
+static float player_fx, player_fy;
+static const float PLAYER_SPEED = 0.075f;
+static const float PLAYER_RADIUS = 0.28f;
 
 static const float cube_faces[6][4][3] = {
     {{0,1,0},{1,1,0},{1,1,1},{0,1,1}},
@@ -139,6 +142,39 @@ static void building_color(char t,float *r,float *g,float *b,float *h)
     }
 }
 
+static int solid_tile(char t)
+{
+    return t == 'T' || t == 'W' ||
+           (strchr("CGBA LFNDEHJKXO IQZsRcqYMVU", t) != NULL && t != ' ');
+}
+
+static int player_can_stand(float x, float y)
+{
+    const float offsets[5][2] = {
+        {0.0f, 0.0f}, {-PLAYER_RADIUS, 0.0f}, {PLAYER_RADIUS, 0.0f},
+        {0.0f, -PLAYER_RADIUS}, {0.0f, PLAYER_RADIUS}
+    };
+    for (int i = 0; i < 5; ++i) {
+        int tx = (int)floorf(x + offsets[i][0] + 0.5f);
+        int ty = (int)floorf(y + offsets[i][1] + 0.5f);
+        if (tx < 0 || ty < 0 || tx >= map_width || ty >= map_height) return 0;
+        if (solid_tile(map_at(tx, ty))) return 0;
+    }
+    return 1;
+}
+
+static void update_player(float dx, float dy)
+{
+    float length = sqrtf(dx * dx + dy * dy);
+    if (length > 1.0f) { dx /= length; dy /= length; }
+    dx *= PLAYER_SPEED;
+    dy *= PLAYER_SPEED;
+    if (player_can_stand(player_fx + dx, player_fy)) player_fx += dx;
+    if (player_can_stand(player_fx, player_fy + dy)) player_fy += dy;
+    player_x = (int)floorf(player_fx + 0.5f);
+    player_y = (int)floorf(player_fy + 0.5f);
+}
+
 static void draw_city(void)
 {
     int x0=player_x-MAP_RADIUS, x1=player_x+MAP_RADIUS;
@@ -178,6 +214,9 @@ static void draw_city(void)
             }
         }
     }
+    box(-CELL_SCALE*.16f, 0.0f, -CELL_SCALE*.16f,
+         CELL_SCALE*.16f, CELL_SCALE*.75f, CELL_SCALE*.16f,
+         .92f, .18f, .12f, player_x, player_y, '#');
     C3D_ImmDrawEnd();
 }
 
@@ -236,14 +275,21 @@ int main(int argc,char **argv)
     printf("Mapa original: %d x %d\n",map_width,map_height);
     printf("Inicio original: %d, %d\n",player_x,player_y);
     printf("Vista local: %d x %d celdas\n",MAP_RADIUS*2+1,MAP_RADIUS*2+1);
-    printf("Izq./Der.: girar ciudad\n");
-    printf("Arriba/Abajo: inclinar vista\n");
+    player_fx = (float)player_x;
+    player_fy = (float)player_y;
+    printf("Stick: mover jugador\n");
+    printf("Cruceta izq./der.: girar camara\n");
+    printf("Cruceta arriba/abajo: inclinar\n");
+    printf("Colisiones: edificios, arboles y agua\n");
     printf("START: salir\n");
 
     while(aptMainLoop()) {
         hidScanInput();
         u32 down=hidKeysDown();
         if(down&KEY_START)break;
+        circlePosition circle;
+        hidCircleRead(&circle);
+        update_player((float)circle.dx / 156.0f, -(float)circle.dy / 156.0f);
         if(down&KEY_LEFT)angle_y-=.08f;
         if(down&KEY_RIGHT)angle_y+=.08f;
         if(down&KEY_UP)angle_x-=.05f;
