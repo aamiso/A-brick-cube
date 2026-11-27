@@ -63,7 +63,7 @@ else
 DEPENDS := $(OFILES:.o=.d)
 
 $(OUTPUT).smdh :
-	@$(SMDHTOOL) --create "$(APP_TITLE)" "$(APP_DESC)" "$(APP_AUTHOR)" $@
+	@$(SMDHTOOL) --create "$(APP_TITLE)" "$(APP_DESC)" "$(APP_AUTHOR)" $@ || $(SMDHTOOL) -c "$(APP_TITLE)" "$(APP_DESC)" "$(APP_AUTHOR)" $@
 
 $(OUTPUT).3dsx : $(OUTPUT).elf $(OUTPUT).smdh
 	@3dsxtool $< $@ --smdh=$(OUTPUT).smdh $(_3DSXFLAGS)
