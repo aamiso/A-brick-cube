@@ -9,7 +9,7 @@
 #define CLEAR_COLOR 0x82B9E8FF
 #define DISPLAY_TRANSFER_FLAGS (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 #define MAP_MAX 400
-#define MAP_RADIUS 12
+#define MAP_RADIUS 22
 #define CELL_SCALE 0.16f
 
 static DVLB_s *vshader_dvlb;
@@ -223,7 +223,7 @@ static void draw_original_character(void)
     const float step = sinf(walk_phase) * .48f;
 
     // Piernas: 0.6 unidades de alto, pivote en la cadera.
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box((player_fx-player_x)*s, 0, (player_fy-player_y)*s,
         -.017f*s, .60f*s, 0, .30f*s, .60f*s, .30f*s,
         step, player_angle, pants_r,pants_g,pants_b);
     character_box(player_fx*s, 0, player_fy*s,
