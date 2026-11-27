@@ -4,6 +4,13 @@ SOURCES     := source
 INCLUDES    := source ../src
 ROMFS       := ../data
 
+PREFIX      := arm-none-eabi-
+CC          := $(PREFIX)gcc
+CXX         := $(PREFIX)g++
+AS          := $(PREFIX)as
+AR          := $(PREFIX)ar
+LD          := $(PREFIX)g++
+
 ARCH        := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CFLAGS      := -g -Wall -O2 -mword-relocations -fomit-frame-pointer -ffunction-sections $(ARCH)
 CFLAGS      += $(INCLUDE) -D__3DS__
@@ -26,7 +33,6 @@ CFILES      := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES    := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES      := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 
-export LD   := $(CXX)
 export OFILES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
                    $(foreach dir,$(LIBDIRS),-I$(dir)/include) \
@@ -57,6 +63,18 @@ $(OUTPUT).3dsx : $(OUTPUT).elf
 
 $(OUTPUT).elf : $(OFILES)
 	@$(LD) $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
+
+%.o : %.c
+	@echo $(notdir $<)
+	@$(CC) -MMD -MP -MF $(DEPSDIR)/$*.d $(CFLAGS) -c $< -o $@
+
+%.o : %.cpp
+	@echo $(notdir $<)
+	@$(CXX) -MMD -MP -MF $(DEPSDIR)/$*.d $(CXXFLAGS) -c $< -o $@
+
+%.o : %.s
+	@echo $(notdir $<)
+	@$(AS) $(ASFLAGS) $< -o $@
 
 -include $(DEPENDS)
 
