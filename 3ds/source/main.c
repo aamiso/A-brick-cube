@@ -213,9 +213,8 @@ static void update_player(float dx, float dy, int run)
     else player_vy = 0.0f;
 
     float actual = sqrtf(player_vx*player_vx + player_vy*player_vy);
-    float max_speed = run ? PLAYER_RUN_SPEED : PLAYER_SPEED;
-    player_anim_speed = actual / max_speed;
-    if (player_anim_speed > 1.0f) player_anim_speed = 1.0f;
+    player_anim_speed = actual / PLAYER_SPEED;
+    if (player_anim_speed > 1.7f) player_anim_speed = 1.7f;
 
     if (actual > 0.0015f) {
         float target_angle = atan2f(player_vx, player_vy);
@@ -283,12 +282,15 @@ static void draw_original_character(void)
     const float mouth[3]={0xb8/255.0f,0x48/255.0f,0x4a/255.0f};
 
     float vel=player_anim_speed;
+    float correr=vel>1.0f?(vel-1.0f)/0.7f:0.0f;
+    if(correr>1.0f)correr=1.0f;
+    if(vel>1.0f)vel=1.0f;
     float step=sinf(walk_phase);
-    float quieto=1.0f-vel;
-    float balanceo=step*48.0f*vel*(3.14159265f/180.0f);
-    float rebote=fabsf(step)*0.07f*vel*s;
+    float quieto=(1.0f-vel);
+    float balanceo=step*(48.0f+24.0f*correr)*vel*(3.14159265f/180.0f);
+    float rebote=fabsf(step)*(0.07f+0.06f*correr)*vel*s;
     float respira=sinf(anim_time*2.2f)*0.012f*quieto*s;
-    float inclina=(5.0f*vel)* (3.14159265f/180.0f);
+    float inclina=((5.0f+11.0f*correr)*vel)*(3.14159265f/180.0f);
     float giro_torso=step*7.0f*vel*(3.14159265f/180.0f);
     float mira=sinf(anim_time*0.6f)*14.0f*quieto*(3.14159265f/180.0f);
     float abre=(4.0f+sinf(anim_time*2.2f)*1.5f*quieto)*(3.14159265f/180.0f);
