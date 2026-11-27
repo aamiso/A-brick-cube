@@ -20,6 +20,7 @@ static int u_projection, u_modelView;
 static char map_grid[MAP_MAX][MAP_MAX];
 static int map_width, map_height, player_x, player_y;
 static float angle_x = 0.82f, angle_y = 0.35f;
+static float camera_target_yaw = 0.35f;
 static float player_fx, player_fy;
 static const float PLAYER_SPEED = 0.075f;
 static const float PLAYER_RADIUS = 0.28f;
@@ -289,9 +290,21 @@ int main(int argc,char **argv)
         if(down&KEY_START)break;
         circlePosition circle;
         hidCircleRead(&circle);
-        update_player((float)circle.dx / 156.0f, -(float)circle.dy / 156.0f);
-        if(down&KEY_LEFT)angle_y-=.08f;
-        if(down&KEY_RIGHT)angle_y+=.08f;
+        float move_x = (float)circle.dx / 156.0f;
+        float move_y = -(float)circle.dy / 156.0f;
+        update_player(move_x, move_y);
+
+        // La camara orbita alrededor del jugador y mira desde atras
+        // hacia la direccion en la que se esta desplazando.
+        float move_length = sqrtf(move_x * move_x + move_y * move_y);
+        if (move_length > 0.18f)
+            camera_target_yaw = atan2f(-move_x, move_y);
+
+        if(down&KEY_LEFT)camera_target_yaw-=.18f;
+        if(down&KEY_RIGHT)camera_target_yaw+=.18f;
+        float yaw_delta = atan2f(sinf(camera_target_yaw-angle_y),
+                                 cosf(camera_target_yaw-angle_y));
+        angle_y += yaw_delta * .12f;
         if(down&KEY_UP)angle_x-=.05f;
         if(down&KEY_DOWN)angle_x+=.05f;
         if(angle_x<.25f)angle_x=.25f;
