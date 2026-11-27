@@ -2,6 +2,8 @@
 #include "world/ciudad.h"
 #include "world/vehiculos.h"
 #include "world/escombros.h"
+#include "world/misiones.h"
+#include "engine/cubo.h"
 #include "player/personaje.h"
 #include "ui/dialogo.h"
 #include "core/util.h"
@@ -178,6 +180,10 @@ void npcs_dibujar(float px, float pz) {
         if (n->muerto) continue;
         if (fabsf(n->x - px) > 60.0f || fabsf(n->z - pz) > 60.0f) continue;
         personaje_dibujar(&var[n->variante], n->x, n->z, n->ang, n->vel, n->fase, n->tiempo, 0.0f);
+        if (npc_da_mision(i) && !mision_activa() && !n->hablando) {          // cubito amarillo flotando: ofrece una misión
+            cubo_activar();
+            caja(n->x, 3.3f + sinf(n->tiempo * 3.0f) * 0.15f, n->z, 0.35f, 0.35f, 0.35f, 1.0f, 0.85f, 0.1f);
+        }
     }
 }
 
@@ -208,3 +214,5 @@ void npc_hablar(int n, float px, float pz) {
 }
 
 void npc_soltar(int n) { npcs[n].hablando = 0; npcs[n].espera = 30; }
+
+int npc_da_mision(int n) { return n % 3 == 0; }

@@ -15,7 +15,7 @@ include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 # Nombre y datos del juego en la Vita
 set(VITA_APP_NAME "A Brick Cube")
 set(VITA_TITLEID  "ABCV00001")
-set(VITA_VERSION  "00.82")
+set(VITA_VERSION  "00.86")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-q -O2 -std=gnu99")
 
@@ -61,6 +61,13 @@ file(GLOB MODELOS_VOXEL ${CMAKE_SOURCE_DIR}/data/modelos/*.txt)
 foreach(modelo ${MODELOS_VOXEL})
   get_filename_component(nombre_modelo ${modelo} NAME)
   list(APPEND VPK_ARCHIVOS FILE ${modelo} data/modelos/${nombre_modelo})
+endforeach()
+
+# Carátulas del juego (icono y pantalla del LiveArea)
+foreach(arch sce_sys/icon0.png sce_sys/livearea/contents/bg0.png sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/template.xml)
+  if(EXISTS ${CMAKE_SOURCE_DIR}/${arch})
+    list(APPEND VPK_ARCHIVOS FILE ${CMAKE_SOURCE_DIR}/${arch} ${arch})
+  endif()
 endforeach()
 
 vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self

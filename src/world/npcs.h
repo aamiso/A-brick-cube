@@ -12,4 +12,6 @@ const char *npc_nombre(int n);
 void npc_hablar(int n, float px, float pz);
 void npc_soltar(int n);                                // termina la charla: sigue caminando
 
+int  npc_da_mision(int n);                          // 1 si este NPC ofrece misiones
+
 #endif

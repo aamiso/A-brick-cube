@@ -19,6 +19,7 @@ void vehiculos_pasivos(int activo);
 void vehiculo_velocidad(int n, float *vx, float *vz);
 void vehiculo_pos(int n, float *x, float *z, float *angulo, float *vel);
 
+void vehiculo_poner(int n, float x, float z, float ang);   // coloca un carro (pruebas)
 int vehiculo_danio(int n);   // 1 si ya tiene el frente roto
 // Inclinación de la carrocería (grados): roll = balanceo, pitch = cabeceo
 void vehiculo_inclinacion(int n, float *roll, float *pitch, float *alt);
@@ -29,5 +30,7 @@ int vehiculos_atropella(float x, float z, float radio, float *vx, float *vz);
 void vehiculos_ia(float px, float pz, int activo);
 int  vehiculos_cantidad(void);
 void vehiculo_tomar(int n);      // el jugador se sube: deja de ser de la IA
+
+int  vehiculos_choques(void);   // cuántos choques fuertes van (para las misiones)
 
 #endif

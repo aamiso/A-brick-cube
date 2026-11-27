@@ -25,7 +25,7 @@ typedef struct {
 // Letras: N = persona · # pared · C mostrador · B cama · T mesa · S banco · P planta · W estante · M máquina · F nevera · R alfombra
 static const Cuarto CUARTOS[] = {
  { 'Y', "Hospital", 0xe8f1f2, 0xcfe3e6, 0xf2f2f2, 0x2aa7b8, 0xffffff, 0xd8e0e4, 0x3a8fd0, 16, 10,
-   { "BB.BB..MM..BB.BB", "................", "......N.........", "................", "PP............PP",
+   { "BB.BB1.MM..BB.BB", "................", "......N.........", "................", "PP............PP",
      "................", ".......N........", "...CCCCCCCC.....", "...N............", "SS..S.........PP" },
    { { "Dra. Elena", "Doctora", { { "Bienvenido al hospital. ¿Te sientes bien?", "Descansa y toma agua.", 0 },
                                   { "Los cubitos también se enferman, ¿sabías?", "Es broma. Cuídate.", 0 },
@@ -37,7 +37,7 @@ static const Cuarto CUARTOS[] = {
                                   { "Llevo horas esperando...", "Pero la sala es bonita.", 0 },
                                   { "Los médicos de aquí son muy buenos.", 0, 0 } } } } },
  { 'Q', "Café", 0xc99a62, 0xb88650, 0x8c3b2b, 0x4a2a1f, 0x6b4426, 0xa9783f, 0xf2c230, 15, 9,
-   { "WWW.MM.....PP.W", "......N........", "FCCCCCCC.......", "..............P", "..T..S...T..S..",
+   { "WWW.MM..1..PP.W", "......N........", "FCCCCCCC.......", "..............P", "..T..S...T..S..",
      "...............", "S..T..S...N....", "...............", "..S.....T.S...." },
    { { "Barista Lucía", "Cafetera", { { "¡Bienvenido! Hoy el café está recién hecho.", "Cuesta cero cubitos, ¡es una demo!", 0 },
                                       { "Mi especial es el capuchino de cubos.", 0, 0 },
@@ -46,13 +46,13 @@ static const Cuarto CUARTOS[] = {
                              { "Vengo todos los días a leer un rato.", 0, 0 },
                              { "Shh... estoy pensando en mi próximo viaje.", 0, 0 } } } } },
  { 'M', "Farmacia", 0xe6f3e6, 0xd2e8d2, 0xf4f4f4, 0x3aa655, 0xffffff, 0xe0ece0, 0x3aa655, 12, 8,
-   { "WWWW.WWWW.WW", "............", ".....N......", "............", "..CCCCCC....",
+   { "WWWW1WWWW.WW", "............", ".....N......", "............", "..CCCCCC....",
      "............", "P..........P", "S...S......." },
    { { "Dr. Raúl", "Farmacéutico", { { "Bienvenido a la farmacia.", "Aquí hay de todo, menos medicinas de verdad.", 0 },
                                     { "Recuerda: mucha agua y buen descanso.", 0, 0 },
                                     { "¿Buscas algo? Seguro no lo tengo.", "Es broma, ¡estoy aprendiendo!", 0 } } } } },
  { 'X', "Banco", 0xd9d4c4, 0xc9c3b0, 0x6a7a8a, 0x2a3440, 0xf2c230, 0x8a8f96, 0xf2c230, 14, 8,
-   { "WW..MM....WW.P", "..............", "....N...N.....", "..CCCCCCCCC...", "..............",
+   { "WW1.MM.2...WW.P", "..............", "....N...N.....", "..CCCCCCCCC...", "..............",
      "S..........S..", "P............P", "...N.........." },
    { { "Cajera Sofía", "Cajera", { { "Bienvenido al banco.", "Aquí todo es de mentiras, ¡pero se ve serio!", 0 },
                                   { "El dinero no da la felicidad.", "Pero ayuda a comprar café.", 0 },
@@ -73,7 +73,7 @@ static const Cuarto CUARTOS[] = {
                                         { "Todo cubo tiene su secreto.", 0, 0 },
                                         { "Shh, estoy concentrada.", 0, 0 } } } } },
  { 'c', "Comisaría", 0xcfd6e0, 0xbcc6d4, 0xdfe6f0, 0x2a4fb0, 0xffffff, 0x4a5a78, 0x2a4fb0, 16, 9,
-   { "WW.MM..WW..WW.FF", "................", "...N.......N....", "..CCCCC.........", "................",
+   { "WW1MM..WW2.WW.FF", "................", "...N.......N....", "..CCCCC.........", "................",
      "S....T.......PP.", "S............N..", "................", "P..............." },
    { { "Oficial Ramírez", "Policía", { { "Bienvenido a la comisaría.", "Aquí todo está bajo control.", 0 },
                                       { "Si ves algo raro en la ciudad, avísame.", 0, 0 },
@@ -86,6 +86,9 @@ static const Cuarto CUARTOS[] = {
                                   { "Buenas, buenas.", 0, 0 } } } } },
 };
 #define N_CUARTOS ((int)(sizeof(CUARTOS) / sizeof(CUARTOS[0])))
+#include "world/interior_datos.h"
+#define N_EXTRA ((int)(sizeof(EXTRA) / sizeof(EXTRA[0])))
+#define N_ENLACES ((int)(sizeof(ENLACES) / sizeof(ENLACES[0])))
 
 typedef struct { float x, z; int g; int visitas; } Npc;
 static const Cuarto *cuarto = 0;
@@ -103,12 +106,25 @@ static const unsigned PAN[N_VAR] = { 0xe0e8ec, 0x2f62c9, 0x30343a, 0x5a3a22, 0x3
 static const unsigned PIE[N_VAR] = { 0xf2c230, 0xe0a85c, 0xc98a4a, 0xf2c230, 0x9a6a3c, 0xe8b878 };
 static const unsigned PEL[N_VAR] = { 0x3a2414, 0x15120f, 0x8a5a22, 0xe0e0e0, 0x5a3a22, 0x6b3a1a };
 
-static const Cuarto *buscar(char l) {
-    for (int i = 0; i < N_CUARTOS; i++) if (CUARTOS[i].letra == l) return &CUARTOS[i];
+// Cuarto número "i" del lugar "l" (el 0 es la entrada desde la calle)
+static const Cuarto *buscar(char l, int i) {
+    for (int k = 0; k < N_CUARTOS; k++) if (CUARTOS[k].letra == l && i-- == 0) return &CUARTOS[k];
+    for (int k = 0; k < N_EXTRA; k++) if (EXTRA[k].letra == l && i-- == 0) return &EXTRA[k];
     return 0;
 }
-int interior_hay(char l) { return buscar(l) != 0; }
-const char *interior_nombre(char l) { const Cuarto *c = buscar(l); return c ? c->nombre : ""; }
+static char lugar_l = 0;
+static int sala = 0, en_puerta = 0, pend_sala = 0;
+static char pend_dig = 0;
+int interior_hay(char l) { return buscar(l, 0) != 0; }
+static char nombre_lugar[48];
+const char *interior_nombre(char l) {                      // "Casa roja: sala" -> "Casa roja"
+    const Cuarto *c = buscar(l, 0); if (!c) return "";
+    snprintf(nombre_lugar, sizeof(nombre_lugar), "%s", c->nombre);
+    char *d = strchr(nombre_lugar, ':'); if (d) *d = 0;
+    return nombre_lugar;
+}
+const char *interior_titulo(void) { return cuarto ? cuarto->nombre : ""; }
+static int es_puerta(char ch) { return ch >= '1' && ch <= '4'; }
 
 static char celda(const Cuarto *c, int cx, int cz) {       // cx, cz dentro del cuarto (0..w-1, 0..h-1)
     if (cx < 0 || cz < 0 || cx >= c->w || cz >= c->h) return '.';
@@ -133,7 +149,7 @@ static void armar(const Cuarto *c) {
             int x = q * 4, z = r * 4;
             char ch = '.';
             int borde = (q == 0 || r == 0 || q == W - 1 || r == H - 1);
-            int salida = (r == H - 1 && (q == ex - 1 || q == ex));
+            int salida = (sala == 0 && r == H - 1 && (q == ex - 1 || q == ex));
             if (!borde) ch = celda(c, q - 1, r - 1);
             voxel_caja(&v, x, 0, z, 4, 1, 4, ((q + r) & 1) ? 'a' : 'b');     // piso
             if (salida) { voxel_caja(&v, x, 0, z, 4, 1, 4, 'D'); continue; }
@@ -145,9 +161,16 @@ static void armar(const Cuarto *c) {
                     voxel_caja(&v, x, alto, z, 4, 1, 4, 't');
                     if (r == 0 && q > 1 && q < W - 2 && q % 4 == 2) voxel_caja(&v, x + 1, 5, z + 3, 2, 4, 1, 'e');   // ventana
                 }
+                {   // ¿hay una puerta (número) justo al lado, dentro del cuarto? entonces la pared se vuelve puerta de madera
+                    int nq = q, nr = r;
+                    if (r == 0) nr = 1; else if (r == H - 1) nr = H - 2; else if (q == 0) nq = 1; else if (q == W - 1) nq = W - 2;
+                    if ((nq != q || nr != r) && nq > 0 && nr > 0 && nq < W - 1 && nr < H - 1 && es_puerta(celda(c, nq - 1, nr - 1)))
+                        voxel_caja(&v, x, 1, z, 4, alto - 1 > 8 ? 8 : alto - 1, 4, 'D');
+                }
                 sol[r][q] = 1;
                 continue;
             }
+            if (es_puerta(ch)) { voxel_caja(&v, x, 0, z, 4, 1, 4, 'D'); voxel_caja(&v, x + 1, 0, z + 1, 2, 1, 2, 'o'); continue; }
             switch (ch) {
             case 'C': voxel_caja(&v, x, 1, z, 4, 4, 4, 'y'); voxel_caja(&v, x, 5, z, 4, 1, 4, 'x'); sol[r][q] = 1; break;
             case 'B': voxel_caja(&v, x, 1, z, 4, 2, 4, 'z'); voxel_caja(&v, x, 3, z, 4, 1, 4, 'W'); voxel_caja(&v, x + 1, 4, z, 2, 1, 1, 'W');
@@ -173,9 +196,10 @@ static void armar(const Cuarto *c) {
 static float cx_de(int q) { return (q + 0.5f) - W * 0.5f; }
 static float cz_de(int r) { return (r + 0.5f) - H * 0.5f; }
 
-void interior_entrar(char letra, Jugador *j) {
-    const Cuarto *c = buscar(letra);
+static void cargar(char letra, int idx, char dig, Jugador *j) {
+    const Cuarto *c = buscar(letra, idx);
     if (!c) return;
+    lugar_l = letra; sala = idx; en_puerta = 0;
     if (!var_listas) { for (int i = 0; i < N_VAR; i++) personaje_crear(&var[i], CAM[i], PAN[i], PIE[i], PEL[i]); var_listas = 1; }
     if (hay_malla) { malla_liberar(&malla); hay_malla = 0; }
     cuarto = c;
@@ -190,8 +214,19 @@ void interior_entrar(char letra, Jugador *j) {
                 n_gente++;
             }
     j->x = cx_de(W / 2) - 0.5f + 0.5f; j->z = cz_de(H - 2);
-    j->angulo = 180.0f; j->vel = 0; j->elev = j->suelo = 0.25f; j->vy = 0;
+    j->angulo = 180.0f;
+    if (dig) {                                               // llega por una puerta: aparece justo adentro de ella
+        for (int r = 0; r < c->h; r++) for (int q = 0; q < c->w; q++) if (celda(c, q, r) == dig) {
+            int dq = q == 0 ? 1 : q == c->w - 1 ? -1 : 0, dr = r == 0 ? 1 : r == c->h - 1 ? -1 : 0;
+            j->x = cx_de(q + 1 + dq); j->z = cz_de(r + 1 + dr);
+            j->angulo = dr > 0 ? 0.0f : dr < 0 ? 180.0f : dq > 0 ? 90.0f : 270.0f;
+        }
+    }
+    j->vel = 0; j->elev = j->suelo = 0.25f; j->vy = 0;
 }
+
+void interior_entrar(char letra, Jugador *j) { cargar(letra, 0, 0, j); }
+void interior_cambiar(Jugador *j) { cargar(lugar_l, pend_sala, pend_dig, j); }
 
 void interior_salir(void) {
     if (hay_malla) { malla_liberar(&malla); hay_malla = 0; }
@@ -226,7 +261,17 @@ int interior_actualizar(Jugador *j, float lx, float ly, int correr) {
         j->vel += ((correr ? 1.7f : 1.0f) - j->vel) * 0.25f;
     } else j->vel += (0.0f - j->vel) * 0.25f;
     j->elev = j->suelo = 0.25f;
-    return j->z > cz_de(H - 1) - 0.4f && fabsf(j->x) < 1.2f;      // pisó la alfombra de salida
+    {   // ¿pisó una puerta (1-4)? lleva a otro cuarto del mismo lugar
+        int q = (int)floorf(j->x + W * 0.5f), r = (int)floorf(j->z + H * 0.5f);
+        char ch = (q >= 1 && r >= 1 && q <= W - 2 && r <= H - 2) ? celda(cuarto, q - 1, r - 1) : 0;
+        if (!es_puerta(ch)) en_puerta = 0;
+        else if (!en_puerta)
+            for (int k = 0; k < N_ENLACES; k++)
+                if (ENLACES[k].lugar == lugar_l && ENLACES[k].room == sala && ENLACES[k].dig == ch) {
+                    pend_sala = ENLACES[k].to_room; pend_dig = ENLACES[k].to_dig; en_puerta = 1; return 2;
+                }
+    }
+    return sala == 0 && j->z > cz_de(H - 1) - 0.4f && fabsf(j->x) < 1.2f;      // pisó la alfombra de salida
 }
 
 void interior_dibujar(float tiempo) {

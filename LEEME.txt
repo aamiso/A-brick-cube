@@ -67,3 +67,11 @@ v0.80: Pack nuevo de 15 edificios hechos desde cero con paleta fija (tools/edifi
 v0.81: Arreglado carro en reversa al bajarse; escalones bajos sólidos; cara inferior en cubitos; montañas al fondo; 55% menos árboles (menos memoria/FPS); choque levanta el carro y a gran velocidad da una vuelta.
 
 v0.82: Minimapa (arriba derecha), reloj y ciclo dia/noche (8 min por dia), carros con IA que circulan por su carril, giran en cruces y frenan.
+
+v0.83: Misiones: NPCs con cubito amarillo ofrecen entregas, carreras y destruccion (o aceptar / x rechazar). Rayo amarillo en el destino y marca en el minimapa. Dinero en pantalla.
+
+v0.84: Interiores en los 15 lugares, con varios cuartos unidos por puertas (51 cuartos). Nombre del cuarto arriba a la izquierda. Generador: tools/hacer_interiores.py.
+
+v0.85: Arreglado: carros que se quedaban pegados tras chocar (ahora se separan solos) y ahora siempre se puede bajar del carro.
+
+v0.86: caratulas (icono, fondo y pantalla de inicio del LiveArea) en sce_sys/.

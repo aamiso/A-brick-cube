@@ -1,4 +1,5 @@
 #include "world/lugares.h"
+#include "world/interior.h"
 #include "engine/voxel.h"
 #include "engine/malla.h"
 #include "engine/cubo.h"
@@ -225,7 +226,7 @@ char lugar_entrada_cerca(float x, float z, float alcance) {
     for (int i = 0; i < n_lugares; i++) {
         const Lugar *l = &lugares[i];
         char ch = tipos[l->tipo].letra;
-        if (ch != 'Y' && ch != 'Q' && ch != 'M' && ch != 'X' && ch != 'q') continue;
+        if (!interior_hay(ch)) continue;                       // todos los lugares tienen interior
         float dx = fabsf(x - l->x) - l->w * 0.5f, dz = fabsf(z - l->z) - l->d * 0.5f;
         if (dx < 0) dx = 0;
         if (dz < 0) dz = 0;

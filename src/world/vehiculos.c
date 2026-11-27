@@ -177,6 +177,7 @@ void vehiculo_velocidad(int n, float *vx, float *vz) { *vx = carros[n].vx; *vz =
 #define OFS 1.1f
 #define RAD 0.9f
 
+void vehiculo_poner(int n, float x, float z, float ang) { carros[n].x = x; carros[n].z = z; carros[n].ang = ang; carros[n].vel = carros[n].vx = carros[n].vz = 0.0f; }
 int vehiculo_danio(int n) { return carros[n].danio; }
 void vehiculo_inclinacion(int n, float *roll, float *pitch, float *alt) { *roll = carros[n].roll; *pitch = carros[n].pitch; *alt = carros[n].alt; }
 
@@ -223,7 +224,10 @@ void vehiculos_pasivos(int activo) {
         if (i != activo && !carros[i].ia && (fabsf(carros[i].vx) + fabsf(carros[i].vz) > 0.003f || carros[i].alt > 0.0f)) vehiculo_manejar(i, 0.0f, 0.0f, 0.0f, 1);   // freno de mano: se detiene, nunca se va en reversa
 }
 
+static int n_choques = 0;
+int vehiculos_choques(void) { return n_choques; }
 static void choque_frontal(Carro *k, float v) {
+    n_choques++;
     float r = k->ang * PI / 180.0f, fx = sinf(r), fz = cosf(r);
     float px = k->x + fx * 2.1f, pz = k->z + fz * 2.1f;
     escombros_crear(px, 0.9f, pz, fx * v * 0.5f, fz * v * 0.5f, k->color, 14, 0.2f, 0.12f);
@@ -245,6 +249,31 @@ static void choque_frontal(Carro *k, float v) {
         k->danio = 1;
         malla_liberar(&k->malla); malla_iniciar(&k->malla);
         armar_carro(&k->malla, k->color, k->tipo, 1);
+    }
+}
+
+// Si el carro quedó encajado dentro de otro después de un choque, los separa poco a poco (así nunca se quedan pegados)
+static void separar(int n) {
+    Carro *a = &carros[n];
+    for (int m = 0; m < n_carros; m++) {
+        if (m == n) continue;
+        Carro *b = &carros[m];
+        float dx0 = a->x - b->x, dz0 = a->z - b->z;
+        if (dx0 * dx0 + dz0 * dz0 > 25.0f) continue;
+        float ra = a->ang * PI / 180.0f, rb = b->ang * PI / 180.0f;
+        float mejor = 0.0f, nx = 0.0f, nz = 0.0f;
+        for (int i = -1; i <= 1; i++)
+            for (int j = -1; j <= 1; j++) {
+                float ex = a->x + sinf(ra) * i * OFS - (b->x + sinf(rb) * j * OFS);
+                float ez = a->z + cosf(ra) * i * OFS - (b->z + cosf(rb) * j * OFS);
+                float d = sqrtf(ex * ex + ez * ez), pen = 2.0f * RAD + 0.18f - d;     // deja un poquito de aire para que puedan moverse
+                if (pen > mejor) { mejor = pen; if (d > 0.001f) { nx = ex / d; nz = ez / d; } else { nx = 1.0f; nz = 0.0f; } }
+            }
+        if (mejor <= 0.0f) continue;
+        float p = mejor * 0.5f + 0.02f; if (p > 0.12f) p = 0.12f;
+        float ax = a->x + nx * p, az = a->z + nz * p, bx = b->x - nx * p, bz = b->z - nz * p;
+        if (!ciudad_choca(ax, az, RAD * 0.6f)) { a->x = ax; a->z = az; }
+        if (!ciudad_choca(bx, bz, RAD * 0.6f)) { b->x = bx; b->z = bz; }
     }
 }
 
@@ -276,6 +305,7 @@ static void en_el_aire(int n, Carro *k) {
 void vehiculo_manejar(int n, float volante, float gas, float freno, int mano) {
     Carro *k = &carros[n];
     if (k->alt > 0.0f) { en_el_aire(n, k); return; }
+    separar(n);
     float v = k->vel;                                   // rapidez con signo (+ adelante)
     const float REV_MAX = VEL_MAX * 0.3f;
 

@@ -23,6 +23,7 @@
 #include "world/npcs.h"
 #include "world/escombros.h"
 #include "world/reloj.h"
+#include "world/misiones.h"
 #include "ui/minimapa.h"
 #include "world/interior.h"
 #include "world/lugares.h"
@@ -49,8 +50,9 @@ int main(void) {
     npcs_iniciar(jugador.x, jugador.z);
     int en_carro = -1;
     int hablando = -1;
+    int oferta = 0;                        // 1 mientras un NPC ofrece una misión
     char dentro = 0;                       // letra del lugar donde estamos (0 = en la calle)
-    int hablando_i = -1, fase_f = 0, fund = 0, pend_salir = 0;
+    int hablando_i = -1, fase_f = 0, fund = 0, pend_salir = 0, pend_puerta = 0;
     char pend_l = 0;
     float gx = 0, gz = 0, gsuelo = 0;      // dónde estaba en la calle
     Camara cam_guardada;
@@ -75,6 +77,8 @@ int main(void) {
                 if (pend_salir) {
                     interior_salir(); dentro = 0; pend_salir = 0; hablando_i = -1;
                     jugador.x = gx; jugador.z = gz; jugador.suelo = jugador.elev = gsuelo; jugador.vel = 0; camara = cam_guardada;
+                } else if (pend_puerta) {
+                    interior_cambiar(&jugador); pend_puerta = 0; hablando_i = -1;
                 } else {
                     gx = jugador.x; gz = jugador.z; gsuelo = jugador.suelo; cam_guardada = camara;
                     interior_entrar(pend_l, &jugador); dentro = pend_l; hablando = -1;
@@ -89,7 +93,9 @@ int main(void) {
                 interior_actualizar(&jugador, 0, 0, 0);
                 if (dialogo_actualizar((nuevos & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) != 0)) hablando_i = -1;
             } else {
-                if (interior_actualizar(&jugador, lx, ly, (pad.buttons & SCE_CTRL_RTRIGGER) != 0) && fase_f == 0) { pend_salir = 1; fase_f = 1; }
+                { int rv = interior_actualizar(&jugador, lx, ly, (pad.buttons & SCE_CTRL_RTRIGGER) != 0);
+                  if (rv == 1 && fase_f == 0) { pend_salir = 1; fase_f = 1; }
+                  else if (rv == 2 && fase_f == 0) { pend_puerta = 1; fase_f = 1; } }
                 if (nuevos & SCE_CTRL_CIRCLE) {
                     int q = interior_npc_cercano(&jugador, 1.7f);
                     if (q >= 0) { hablando_i = q; interior_hablar(q, &jugador); }
@@ -110,6 +116,8 @@ int main(void) {
             jugador_dibujar(&jugador);
             cubo_desactivar();
             ui_inicio();
+            { const char *tt = interior_titulo(); int w = (int)ui_ancho(tt, 1);
+              ui_rect(14, 14, w + 28, 30, 0x000000B4); ui_texto(28, 20, 1, tt, 0xFFFFFFFF); }
             if (hablando_i >= 0) dialogo_dibujar();
             else {
                 int q = interior_npc_cercano(&jugador, 1.7f);
@@ -131,6 +139,7 @@ int main(void) {
         npcs_actualizar(jugador.x, jugador.z);
         escombros_actualizar();
         reloj_actualizar();
+        mision_actualizar(en_carro >= 0 ? jugador.x : jugador.x, jugador.z, en_carro >= 0);
         vehiculos_ia(jugador.x, jugador.z, en_carro);
         vehiculos_pasivos(en_carro >= 0 ? en_carro : (anim > 0 ? anim_n : -1));
         if (en_carro < 0) camara.sin_choque = 0;
@@ -154,7 +163,14 @@ int main(void) {
         } else if (en_carro < 0) {
             if (hablando >= 0) {
                 jugador_actualizar(&jugador, 0, 0, camara.giro, 0, 0);
-                if (dialogo_actualizar((nuevos & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) != 0)) { npc_soltar(hablando); hablando = -1; }
+                if (dialogo_actualizar((nuevos & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) != 0)) {
+                    if (npc_da_mision(hablando) && !mision_activa() && mision_preparar(jugador.x, jugador.z)) oferta = 1;
+                    npc_soltar(hablando); hablando = -1;
+                }
+            } else if (oferta) {
+                jugador_actualizar(&jugador, 0, 0, camara.giro, 0, 0);
+                if (nuevos & SCE_CTRL_CIRCLE) { mision_aceptar(); oferta = 0; }
+                else if (nuevos & SCE_CTRL_CROSS) oferta = 0;
             } else {
                 jugador_actualizar(&jugador, lx, ly, camara.giro, (pad.buttons & SCE_CTRL_RTRIGGER) != 0,
                                    (nuevos & SCE_CTRL_CROSS) != 0);
@@ -196,11 +212,15 @@ int main(void) {
                 // se baja por el lado derecho (o el primer lado libre)
                 float r = ang * 3.14159265f / 180.0f;
                 int ok = 0;
-                for (int k = 0; k < 4 && !ok; k++) {
-                    float a2 = r + 1.5708f * (k == 0 ? 1 : k == 1 ? -1 : k == 2 ? 2 : 0);
-                    float ex = fx + sinf(a2) * 1.9f, ez = fz + cosf(a2) * 1.9f;
-                    if (!ciudad_choca(ex, ez, 0.45f)) { jugador.x = ex; jugador.z = ez; ok = 1; }
-                }
+                static const float RADIOS[4] = { 1.9f, 2.6f, 3.4f, 4.6f };
+                for (int rr = 0; rr < 4 && !ok; rr++)                 // prueba derecha, izquierda, atrás, adelante y las diagonales, cada vez más lejos
+                    for (int k = 0; k < 8 && !ok; k++) {
+                        static const float GIROS[8] = { 1.5708f, -1.5708f, 3.1416f, 0.0f, 0.7854f, -0.7854f, 2.3562f, -2.3562f };
+                        float a2 = r + GIROS[k];
+                        float ex = fx + sinf(a2) * RADIOS[rr], ez = fz + cosf(a2) * RADIOS[rr];
+                        if (!ciudad_choca(ex, ez, 0.45f) && !vehiculos_choca(ex, ez, 0.45f, -1)) { jugador.x = ex; jugador.z = ez; ok = 1; }
+                    }
+                if (!ok) { jugador.x = fx + sinf(r + 1.5708f) * 1.9f; jugador.z = fz + cosf(r + 1.5708f) * 1.9f; ok = 1; }   // último recurso: siempre se puede bajar
                 if (ok) {
                     ax0 = fx; az0 = fz; ax1 = jugador.x; az1 = jugador.z;
                     jugador.x = ax0; jugador.z = az0;
@@ -236,6 +256,7 @@ int main(void) {
         vehiculos_dibujar(fx, fz);
         npcs_dibujar(fx, fz);
         escombros_dibujar(fx, fz);
+        mision_dibujar_3d(fx, fz);
         if (en_carro < 0) jugador_dibujar(&jugador);
         else { float cx2, cz2, a2, v2; vehiculo_pos(en_carro, &cx2, &cz2, &a2, &v2); float rl, pt, al; vehiculo_inclinacion(en_carro, &rl, &pt, &al); jugador_dibujar_en_carro(&jugador, cx2, cz2, a2, rl, pt, al); }
         cubo_desactivar();
@@ -244,9 +265,16 @@ int main(void) {
         ui_inicio();
         reloj_filtro();                                       // noche / atardecer
         { float mx2 = fx, mz2 = fz; (void)mx2; (void)mz2;
-          minimapa_dibujar(fx, fz, en_carro >= 0 ? 0.0f : jugador.angulo, 0, 0.0f, 0.0f);
+          { float mkx = 0, mkz = 0; int hm = mision_marca(&mkx, &mkz); minimapa_dibujar(fx, fz, en_carro >= 0 ? 0.0f : jugador.angulo, hm, mkx, mkz); }
           char hh[16]; int h = (int)reloj_hora(), mi = (int)((reloj_hora() - h) * 60.0f); snprintf(hh, sizeof(hh), "%02d:%02d", h, mi);
           ui_rect(14, 14, 88, 30, 0x000000B4); ui_texto(22, 20, 1, hh, 0xFFFFFFFF); }
+        mision_dibujar_hud();
+        if (oferta) {
+            char ln[4][96]; int nl = ui_partir(mision_oferta(), 1, 640, ln, 4);
+            ui_rect(150, 380, 660, 30 + nl * 22 + 34, 0x000000D0);
+            for (int i = 0; i < nl; i++) ui_texto(170, 394 + i * 22, 1, ln[i], 0xFFFFFFFF);
+            ui_texto(170, 394 + nl * 22 + 8, 1, "○ Aceptar     × Rechazar", 0xFFE860FF);
+        }
         if (hablando >= 0) dialogo_dibujar();
         else if (en_carro < 0 && anim <= 0) {
             int q = npc_cercano(jugador.x, jugador.z, 2.4f);
