@@ -33,6 +33,8 @@ static size_t build_count, build_capacity;
 static void *world_positions, *world_colors;
 static int world_vertex_count;
 static int building_world_mesh;
+static int mesh_origin_x, mesh_origin_y;
+static const float MESH_RECENTER_DISTANCE = 8.0f;
 static const float PLAYER_SPEED = 0.075f;
 static const float PLAYER_RADIUS = 0.28f;
 
@@ -237,8 +239,8 @@ static void character_box(float ox, float oy, float oz,
 static void draw_original_character(void)
 {
     const float s = CELL_SCALE;
-    const float base_x = (player_fx - player_x) * s;
-    const float base_z = (player_fy - player_y) * s;
+    const float base_x = (player_fx - mesh_origin_x) * s;
+    const float base_z = (player_fy - mesh_origin_y) * s;
     const float skin_r=.95f, skin_g=.76f, skin_b=.60f;
     const float shirt_r=.85f, shirt_g=.22f, shirt_b=.17f;
     const float pants_r=.18f, pants_g=.38f, pants_b=.79f;
@@ -387,6 +389,8 @@ static void draw_city(void)
    Posiciones y colores se separan para usar el formato de atributos PICA. */
 static int rebuild_world_mesh(void)
 {
+    mesh_origin_x = player_x;
+    mesh_origin_y = player_y;
     world_vertex_count = 0;
     if (world_positions) { linearFree(world_positions); world_positions = NULL; }
     if (world_colors) { linearFree(world_colors); world_colors = NULL; }
@@ -510,9 +514,12 @@ int main(int argc,char **argv)
         hidCircleRead(&circle);
         float move_x = (float)circle.dx / 156.0f;
         float move_y = -(float)circle.dy / 156.0f;
-        int old_tile_x = player_x, old_tile_y = player_y;
         update_player(move_x, move_y);
-        if (player_x != old_tile_x || player_y != old_tile_y) {
+        /* La malla se conserva entre varios tiles. Solo se reconstruye al
+           alejarse 8 tiles del centro, evitando pausas de CPU cada paso. */
+        float mdx = player_fx - (float)mesh_origin_x;
+        float mdy = player_fy - (float)mesh_origin_y;
+        if (mdx*mdx + mdy*mdy >= MESH_RECENTER_DISTANCE*MESH_RECENTER_DISTANCE) {
             if (!rebuild_world_mesh())
                 printf("Aviso: no se pudo actualizar la malla del sector.\\n");
         }
@@ -542,7 +549,7 @@ int main(int argc,char **argv)
 
         C3D_Mtx model;
         Mtx_Identity(&model);
-        Mtx_Translate(&model,0.0f,-.48f,-4.25f,true);
+        Mtx_Translate(&model,-(player_fx-mesh_origin_x)*CELL_SCALE,-.48f,-4.25f-(player_fy-mesh_origin_y)*CELL_SCALE,true);
         Mtx_RotateX(&model,angle_x,true);
         Mtx_RotateY(&model,angle_y,true);
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_projection,&projection);
