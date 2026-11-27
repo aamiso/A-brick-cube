@@ -22,6 +22,7 @@ static int map_width, map_height, player_x, player_y;
 static float angle_x = 0.82f, angle_y = 0.35f;
 static float camera_target_yaw = 0.35f;
 static float player_fx, player_fy;
+static float player_angle, walk_phase, anim_time;
 static const float PLAYER_SPEED = 0.075f;
 static const float PLAYER_RADIUS = 0.28f;
 
@@ -176,6 +177,110 @@ static void update_player(float dx, float dy)
     player_y = (int)floorf(player_fy + 0.5f);
 }
 
+
+static void character_vertex(float x, float y, float z, float r, float g, float b)
+{
+    vertex(x, y, z, r, g, b);
+}
+
+// Cuboide del personaje: conserva la forma de bloques del modelo original.
+// Las piezas giran alrededor de su pivote y luego siguen la orientacion del jugador.
+static void character_box(float ox, float oy, float oz,
+                          float px, float py, float pz,
+                          float sx, float sy, float sz,
+                          float rot_x, float rot_y,
+                          float r, float g, float b)
+{
+    float cx = cosf(rot_x), sxr = sinf(rot_x);
+    float cy = cosf(rot_y), syr = sinf(rot_y);
+    for (int f = 0; f < 6; ++f) {
+        for (int k = 0; k < 6; ++k) {
+            int vi = (int[]){0,1,2,0,2,3}[k];
+            float lx = cube_faces[f][vi][0] * sx - px;
+            float ly = cube_faces[f][vi][1] * sy - py;
+            float lz = cube_faces[f][vi][2] * sz - pz;
+            float ry = ly * cx - lz * sxr;
+            float rz = ly * sxr + lz * cx;
+            float rx = lx * cy + rz * syr;
+            float rz2 = -lx * syr + rz * cy;
+            float wx = ox + px + rx;
+            float wy = oy + py + ry;
+            float wz = oz + pz + rz2;
+            float shade = shade_face[f];
+            character_vertex(wx, wy, wz, r * shade, g * shade, b * shade);
+        }
+    }
+}
+
+static void draw_original_character(void)
+{
+    const float s = CELL_SCALE;
+    const float skin_r=.95f, skin_g=.76f, skin_b=.60f;
+    const float shirt_r=.85f, shirt_g=.22f, shirt_b=.17f;
+    const float pants_r=.18f, pants_g=.38f, pants_b=.79f;
+    const float hair_r=.35f, hair_g=.22f, hair_b=.13f;
+    const float shoe_r=.14f, shoe_g=.14f, shoe_b=.17f;
+    const float step = sinf(walk_phase) * .48f;
+
+    // Piernas: 0.6 unidades de alto, pivote en la cadera.
+    character_box(player_fx*s, 0, player_fy*s,
+        -.017f*s, .60f*s, 0, .30f*s, .60f*s, .30f*s,
+        step, player_angle, pants_r,pants_g,pants_b);
+    character_box(player_fx*s, 0, player_fy*s,
+        .17f*s, .60f*s, 0, .30f*s, .60f*s, .30f*s,
+        -step, player_angle, pants_r,pants_g,pants_b);
+    // Zapatos negros en la base de cada pierna.
+    character_box(player_fx*s, 0, player_fy*s,
+        -.017f*s, .04f*s, .035f*s, .34f*s, .12f*s, .42f*s,
+        step, player_angle, shoe_r,shoe_g,shoe_b);
+    character_box(player_fx*s, 0, player_fy*s,
+        .17f*s, .04f*s, .035f*s, .34f*s, .12f*s, .42f*s,
+        -step, player_angle, shoe_r,shoe_g,shoe_b);
+
+    // Torso y cinturón.
+    character_box(player_fx*s, 0, player_fy*s,
+        0, .90f*s, 0, .80f*s, .60f*s, .40f*s,
+        0, player_angle, shirt_r,shirt_g,shirt_b);
+    character_box(player_fx*s, 0, player_fy*s,
+        0, .65f*s, 0, .80f*s, .10f*s, .40f*s,
+        0, player_angle, hair_r, hair_g, hair_b);
+
+    // Brazos articulados: camisa arriba y manos color piel abajo.
+    character_box(player_fx*s, 0, player_fy*s,
+        -.50f*s, .90f*s, 0, .20f*s, .40f*s, .20f*s,
+        -step*.85f, player_angle, shirt_r,shirt_g,shirt_b);
+    character_box(player_fx*s, 0, player_fy*s,
+        -.50f*s, .60f*s, 0, .20f*s, .20f*s, .20f*s,
+        -step*.85f, player_angle, skin_r,skin_g,skin_b);
+    character_box(player_fx*s, 0, player_fy*s,
+        .50f*s, .90f*s, 0, .20f*s, .40f*s, .20f*s,
+        step*.85f, player_angle, shirt_r,shirt_g,shirt_b);
+    character_box(player_fx*s, 0, player_fy*s,
+        .50f*s, .60f*s, 0, .20f*s, .20f*s, .20f*s,
+        step*.85f, player_angle, skin_r,skin_g,skin_b);
+
+    // Cabeza, pelo superior y flequillo frontal (+Z).
+    character_box(player_fx*s, 0, player_fy*s,
+        0, 1.50f*s, 0, .60f*s, .60f*s, .60f*s,
+        0, player_angle, skin_r,skin_g,skin_b);
+    character_box(player_fx*s, 0, player_fy*s,
+        0, 1.95f*s, 0, .60f*s, .10f*s, .60f*s,
+        0, player_angle, hair_r,hair_g,hair_b);
+    character_box(player_fx*s, 0, player_fy*s,
+        0, 1.85f*s, .25f*s, .60f*s, .10f*s, .10f*s,
+        0, player_angle, hair_r,hair_g,hair_b);
+    // Ojos y boca del rostro.
+    character_box(player_fx*s, 0, player_fy*s,
+        -.15f*s, 1.68f*s, .305f*s, .10f*s, .10f*s, .025f*s,
+        0, player_angle, .10f,.10f,.13f);
+    character_box(player_fx*s, 0, player_fy*s,
+        .15f*s, 1.68f*s, .305f*s, .10f*s, .10f*s, .025f*s,
+        0, player_angle, .10f,.10f,.13f);
+    character_box(player_fx*s, 0, player_fy*s,
+        0, 1.53f*s, .305f*s, .20f*s, .04f*s, .025f*s,
+        0, player_angle, .72f,.28f,.29f);
+}
+
 static void draw_city(void)
 {
     int x0=player_x-MAP_RADIUS, x1=player_x+MAP_RADIUS;
@@ -215,9 +320,7 @@ static void draw_city(void)
             }
         }
     }
-    box(-CELL_SCALE*.16f, 0.0f, -CELL_SCALE*.16f,
-         CELL_SCALE*.16f, CELL_SCALE*.75f, CELL_SCALE*.16f,
-         .92f, .18f, .12f, player_x, player_y, '#');
+    draw_original_character();
     C3D_ImmDrawEnd();
 }
 
@@ -293,6 +396,13 @@ int main(int argc,char **argv)
         float move_x = (float)circle.dx / 156.0f;
         float move_y = -(float)circle.dy / 156.0f;
         update_player(move_x, move_y);
+        if (sqrtf(move_x * move_x + move_y * move_y) > 0.18f) {
+            player_angle = atan2f(move_x, move_y);
+            walk_phase += 0.30f;
+        } else {
+            walk_phase *= 0.82f;
+        }
+        anim_time += 1.0f / 60.0f;
 
         // La camara orbita alrededor del jugador y mira desde atras
         // hacia la direccion en la que se esta desplazando.
