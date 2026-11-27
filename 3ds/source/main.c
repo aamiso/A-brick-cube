@@ -481,6 +481,16 @@ static void draw_world_mesh(void)
     C3D_ImmDrawEnd();
 }
 
+/* El backend de compatibilidad transforma los vértices en CPU.
+   Estas matrices identidad evitan aplicar dos veces la cámara en el shader. */
+void brick3ds_set_identity_uniforms(void)
+{
+    C3D_Mtx identity;
+    Mtx_Identity(&identity);
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_projection,&identity);
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_modelView,&identity);
+}
+
 static int scene_init(void)
 {
     vshader_dvlb=DVLB_ParseFile((u32*)vshader_shbin,vshader_shbin_size);
