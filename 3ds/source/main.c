@@ -24,6 +24,15 @@ static float angle_x = 0.82f, angle_y = 0.35f;
 static float camera_target_yaw = 0.35f;
 static float player_fx, player_fy;
 static float player_angle, walk_phase, anim_time;
+
+/* Malla estatica combinada: se construye al iniciar y solo se regenera
+   cuando el jugador cambia de tile. El personaje sigue siendo dinamico. */
+typedef struct { float x, y, z, r, g, b, a; } WorldVertex;
+static WorldVertex *build_vertices;
+static size_t build_count, build_capacity;
+static void *world_positions, *world_colors;
+static int world_vertex_count;
+static int building_world_mesh;
 static const float PLAYER_SPEED = 0.075f;
 static const float PLAYER_RADIUS = 0.28f;
 
@@ -70,6 +79,18 @@ static int load_city_map(void)
 
 static void vertex(float x, float y, float z, float r, float g, float b)
 {
+    if (building_world_mesh) {
+        if (build_count >= build_capacity) {
+            size_t next = build_capacity ? build_capacity * 2 : 16384;
+            WorldVertex *grown = (WorldVertex *)realloc(build_vertices, next * sizeof(WorldVertex));
+            if (!grown) return;
+            build_vertices = grown;
+            build_capacity = next;
+        }
+        WorldVertex *v = &build_vertices[build_count++];
+        v->x=x; v->y=y; v->z=z; v->r=r; v->g=g; v->b=b; v->a=1.0f;
+        return;
+    }
     C3D_ImmSendAttrib(x, y, z, 1.0f);
     C3D_ImmSendAttrib(r, g, b, 1.0f);
 }
@@ -297,7 +318,7 @@ static void draw_city(void)
     const int chunks_x = (map_width + CHUNK_SIZE - 1) / CHUNK_SIZE;
     const int chunks_y = (map_height + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
-    C3D_ImmDrawBegin(GPU_TRIANGLES);
+    if (!building_world_mesh) C3D_ImmDrawBegin(GPU_TRIANGLES);
     for (int cy = 0; cy < chunks_y; ++cy) {
         for (int cx = 0; cx < chunks_x; ++cx) {
             int bx = cx * CHUNK_SIZE;
@@ -357,6 +378,54 @@ static void draw_city(void)
             }
         }
     }
+    if (!building_world_mesh) {
+        C3D_ImmDrawEnd();
+    }
+}
+
+/* Convierte el escenario estatico en dos buffers GPU reutilizables.
+   Posiciones y colores se separan para usar el formato de atributos PICA. */
+static int rebuild_world_mesh(void)
+{
+    if (world_positions) { linearFree(world_positions); world_positions = NULL; }
+    if (world_colors) { linearFree(world_colors); world_colors = NULL; }
+    build_count = 0;
+    building_world_mesh = 1;
+    draw_city();
+    building_world_mesh = 0;
+
+    if (build_count == 0 || build_count > 700000) return 0;
+    world_positions = linearAlloc(build_count * 3 * sizeof(float));
+    world_colors = linearAlloc(build_count * 4 * sizeof(float));
+    if (!world_positions || !world_colors) {
+        if (world_positions) linearFree(world_positions);
+        if (world_colors) linearFree(world_colors);
+        world_positions = world_colors = NULL;
+        return 0;
+    }
+    float *p = (float *)world_positions;
+    float *col = (float *)world_colors;
+    for (size_t i = 0; i < build_count; ++i) {
+        const WorldVertex *v = &build_vertices[i];
+        *p++=v->x; *p++=v->y; *p++=v->z;
+        *col++=v->r; *col++=v->g; *col++=v->b; *col++=v->a;
+    }
+    world_vertex_count = (int)build_count;
+    free(build_vertices);
+    build_vertices = NULL;
+    build_capacity = 0;
+    return 1;
+}
+
+static void draw_world_mesh(void)
+{
+    C3D_BufInfo *buf = C3D_GetBufInfo();
+    BufInfo_Init(buf);
+    BufInfo_Add(buf, world_positions, 3 * sizeof(float), 1, 0x0);
+    BufInfo_Add(buf, world_colors, 4 * sizeof(float), 1, 0x1);
+    C3D_DrawArrays(GPU_TRIANGLES, 0, world_vertex_count);
+
+    C3D_ImmDrawBegin(GPU_TRIANGLES);
     draw_original_character();
     C3D_ImmDrawEnd();
 }
@@ -419,6 +488,8 @@ int main(int argc,char **argv)
     printf("Render por sectores: %d x %d tiles\n", CHUNK_SIZE, CHUNK_SIZE);
     player_fx = (float)player_x;
     player_fy = (float)player_y;
+    if (!rebuild_world_mesh())
+        printf("Aviso: no se pudo crear la malla estatica; se usara render de emergencia.\\n");
     printf("Stick: mover jugador\n");
     printf("Cruceta izq./der.: girar camara\n");
     printf("Cruceta arriba/abajo: inclinar\n");
@@ -433,7 +504,12 @@ int main(int argc,char **argv)
         hidCircleRead(&circle);
         float move_x = (float)circle.dx / 156.0f;
         float move_y = -(float)circle.dy / 156.0f;
+        int old_tile_x = player_x, old_tile_y = player_y;
         update_player(move_x, move_y);
+        if (player_x != old_tile_x || player_y != old_tile_y) {
+            if (!rebuild_world_mesh())
+                printf("Aviso: no se pudo actualizar la malla del sector.\\n");
+        }
         if (sqrtf(move_x * move_x + move_y * move_y) > 0.18f) {
             player_angle = atan2f(move_x, move_y);
             walk_phase += 0.30f;
@@ -460,7 +536,7 @@ int main(int argc,char **argv)
 
         C3D_Mtx model;
         Mtx_Identity(&model);
-        Mtx_Translate(&model,0.0f,-.75f,-6.2f,true);
+        Mtx_Translate(&model,0.0f,-.48f,-4.25f,true);
         Mtx_RotateX(&model,angle_x,true);
         Mtx_RotateY(&model,angle_y,true);
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_projection,&projection);
@@ -469,10 +545,19 @@ int main(int argc,char **argv)
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
         C3D_RenderTargetClear(target,C3D_CLEAR_ALL,CLEAR_COLOR,0);
         C3D_FrameDrawOn(target);
-        draw_city();
+        if (world_positions && world_vertex_count > 0)
+            draw_world_mesh();
+        else {
+            C3D_ImmDrawBegin(GPU_TRIANGLES);
+            draw_city();
+            C3D_ImmDrawEnd();
+        }
         C3D_FrameEnd(0);
     }
 
+    if (world_positions) linearFree(world_positions);
+    if (world_colors) linearFree(world_colors);
+    free(build_vertices);
     shaderProgramFree(&program);
     DVLB_Free(vshader_dvlb);
     C3D_RenderTargetDelete(target);
