@@ -1,0 +1,26 @@
+name: Build 3DS
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compilar .3dsx
+        run: |
+          cd 3ds
+          make -j$(nproc)
+
+      - name: Subir artefacto 3DS
+        uses: actions/upload-artifact@v4
+        with:
+          name: A-brick-cube-3ds
+          path: 3ds/A-brick-cube-3ds.3dsx
