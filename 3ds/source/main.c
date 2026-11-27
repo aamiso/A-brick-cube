@@ -196,9 +196,9 @@ static void character_box(float ox, float oy, float oz,
     for (int f = 0; f < 6; ++f) {
         for (int k = 0; k < 6; ++k) {
             int vi = (int[]){0,1,2,0,2,3}[k];
-            float lx = cube_faces[f][vi][0] * sx - px;
-            float ly = cube_faces[f][vi][1] * sy - py;
-            float lz = cube_faces[f][vi][2] * sz - pz;
+            float lx = (cube_faces[f][vi][0] - 0.5f) * sx;
+            float ly = (cube_faces[f][vi][1] - 0.5f) * sy;
+            float lz = (cube_faces[f][vi][2] - 0.5f) * sz;
             float ry = ly * cx - lz * sxr;
             float rz = ly * sxr + lz * cx;
             float rx = lx * cy + rz * syr;
