@@ -387,6 +387,7 @@ static void draw_city(void)
    Posiciones y colores se separan para usar el formato de atributos PICA. */
 static int rebuild_world_mesh(void)
 {
+    world_vertex_count = 0;
     if (world_positions) { linearFree(world_positions); world_positions = NULL; }
     if (world_colors) { linearFree(world_colors); world_colors = NULL; }
     build_count = 0;
@@ -394,7 +395,12 @@ static int rebuild_world_mesh(void)
     draw_city();
     building_world_mesh = 0;
 
-    if (build_count == 0 || build_count > 700000) return 0;
+    if (build_count == 0 || build_count > 700000) {
+        free(build_vertices);
+        build_vertices = NULL;
+        build_capacity = 0;
+        return 0;
+    }
     world_positions = linearAlloc(build_count * 3 * sizeof(float));
     world_colors = linearAlloc(build_count * 4 * sizeof(float));
     if (!world_positions || !world_colors) {
@@ -548,9 +554,7 @@ int main(int argc,char **argv)
         if (world_positions && world_vertex_count > 0)
             draw_world_mesh();
         else {
-            C3D_ImmDrawBegin(GPU_TRIANGLES);
             draw_city();
-            C3D_ImmDrawEnd();
         }
         C3D_FrameEnd(0);
     }
