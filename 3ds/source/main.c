@@ -9,7 +9,7 @@
 #define CLEAR_COLOR 0x82B9E8FF
 #define DISPLAY_TRANSFER_FLAGS (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 #define MAP_MAX 400
-#define MAP_RADIUS 19
+#define MAP_RADIUS 12
 #define CELL_SCALE 0.16f
 
 static DVLB_s *vshader_dvlb;
@@ -302,7 +302,9 @@ static void draw_city(void)
             if(t=='='){gr=.29f;gg=.30f;gb=.34f;}
             else if(t=='S'){gr=.70f;gg=.69f;gb=.65f;}
             else if(t=='W'){gr=.14f;gg=.42f;gb=.78f;}
-            map_quad(xlo,-.02f,zlo,xhi,zhi,gr,gg,gb);
+            // No dibujar suelo oculto bajo edificios o arboles.
+            if (!is_building(t) && t != 'T')
+                map_quad(xlo,-.02f,zlo,xhi,zhi,gr,gg,gb);
 
             if(is_building(t)) {
                 float r,g,b,h;
