@@ -71,8 +71,10 @@ static int load_voxel_model(const char *path, VoxelModel *m)
     buffer[read_size] = '\0';
 
     int w = 0, d = 0, h = 0, row = 0, in_layer = 0;
+    char *dimension_buffer = strdup(buffer);
+    if (!dimension_buffer) { free(buffer); return 0; }
     char *save = NULL;
-    for (char *line = strtok_r(buffer, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+    for (char *line = strtok_r(dimension_buffer, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
         size_t len = strlen(line);
         while (len && (line[len-1] == '\r' || line[len-1] == ' ' || line[len-1] == '\t')) line[--len] = 0;
         char *p = line;
@@ -86,6 +88,7 @@ static int load_voxel_model(const char *path, VoxelModel *m)
         }
     }
 
+    free(dimension_buffer);
     if (w <= 0 || d <= 0 || h <= 0 || w > 128 || d > 128 || h > 200) {
         free(buffer); return 0;
     }
