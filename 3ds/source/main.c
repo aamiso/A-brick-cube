@@ -339,7 +339,7 @@ static int scene_init(void)
     AttrInfo_Init(attrs);
     AttrInfo_AddLoader(attrs,0,GPU_FLOAT,3);
     AttrInfo_AddLoader(attrs,1,GPU_FLOAT,4);
-    Mtx_PerspTilt(&projection,C3D_AngleFromDegrees(55.0f),C3D_AspectRatioTop,.1f,100.0f,true);
+    Mtx_PerspTilt(&projection,C3D_AngleFromDegrees(55.0f),C3D_AspectRatioTop,.1f,100.0f,false);
     C3D_TexEnv *env=C3D_GetTexEnv(0);
     C3D_TexEnvInit(env);
     C3D_TexEnvSrc(env,C3D_Both,GPU_PRIMARY_COLOR,0,0);
@@ -424,9 +424,9 @@ int main(int argc,char **argv)
 
         C3D_Mtx model;
         Mtx_Identity(&model);
+        Mtx_Translate(&model,0.0f,-.75f,-6.2f,true);
         Mtx_RotateX(&model,angle_x,true);
         Mtx_RotateY(&model,angle_y,true);
-        Mtx_Translate(&model,0.0f,-.75f,-6.2f,true);
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_projection,&projection);
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_modelView,&model);
 
