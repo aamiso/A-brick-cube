@@ -4,12 +4,17 @@ SOURCES     := source
 INCLUDES    := source ../src
 ROMFS       := ../data
 
+APP_TITLE   := A Brick Cube 3DS
+APP_AUTHOR  := aamiso
+APP_DESC    := Port 3DS
+
 PREFIX      := arm-none-eabi-
 CC          := $(PREFIX)gcc
 CXX         := $(PREFIX)g++
 AS          := $(PREFIX)as
 AR          := $(PREFIX)ar
 LD          := $(PREFIX)g++
+SMDHTOOL    := smdhtool
 
 ARCH        := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CFLAGS      := -g -Wall -O2 -mword-relocations -fomit-frame-pointer -ffunction-sections $(ARCH)
@@ -51,14 +56,17 @@ $(BUILD):
 
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).3dsx $(TARGET).elf
+	@rm -fr $(BUILD) $(TARGET).3dsx $(TARGET).elf $(TARGET).smdh
 
 else
 
 DEPENDS := $(OFILES:.o=.d)
 
-$(OUTPUT).3dsx : $(OUTPUT).elf
-	@3dsxtool $< $@ $(_3DSXFLAGS)
+$(OUTPUT).smdh :
+	@$(SMDHTOOL) --create "$(APP_TITLE)" "$(APP_DESC)" "$(APP_AUTHOR)" $@
+
+$(OUTPUT).3dsx : $(OUTPUT).elf $(OUTPUT).smdh
+	@3dsxtool $< $@ --smdh=$(OUTPUT).smdh $(_3DSXFLAGS)
 	@echo "Compilado: $(notdir $@)"
 
 $(OUTPUT).elf : $(OFILES)
