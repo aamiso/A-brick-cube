@@ -86,16 +86,12 @@ static void map_quad(float x0,float y,float z0,float x1,float z1,float r,float g
 static void box(float x0,float y0,float z0,float x1,float y1,float z1,
                 float r,float g,float b,int map_x,int map_y,char type)
 {
-    static const int face_dx[6]={0,0,0,1,-1,0};
-    static const int face_dy[6]={0,0,0,0,0,0};
-    (void)face_dy;
     for (int f=0;f<6;++f) {
-        int nx=map_x+face_dx[f], ny=map_y;
-        if (f==0 && map_at(map_x,map_y-1)==type) continue;
+        if (f==5) continue; // la cara inferior nunca se ve
         if (f==1 && map_at(map_x,map_y+1)==type) continue;
+        if (f==2 && map_at(map_x,map_y-1)==type) continue;
         if (f==3 && map_at(map_x+1,map_y)==type) continue;
         if (f==4 && map_at(map_x-1,map_y)==type) continue;
-        (void)nx; (void)ny;
         float p[4][3];
         for(int k=0;k<4;++k) {
             p[k][0]=x0+cube_faces[f][k][0]*(x1-x0);
@@ -170,17 +166,7 @@ static void draw_city(void)
                 float r,g,b,h;
                 building_color(t,&r,&g,&b,&h);
                 box(xlo,0.0f,zlo,xhi,h*CELL_SCALE,zhi,r,g,b,mx,my,t);
-                // Ventanas sencillas en las fachadas visibles de los edificios altos.
-                if(h>2.4f) {
-                    float wy=CELL_SCALE*.75f;
-                    for(float yy=wy;yy<h*CELL_SCALE-.10f;yy+=CELL_SCALE*.72f) {
-                        float win=.035f;
-                        const float wr=.20f,wg=.78f,wb=.90f;
-                        map_quad(xlo+.018f,yy,zlo+.003f,xlo+.028f,zhi-.003f,wr,wg,wb);
-                        map_quad(xhi-.028f,yy,zlo+.003f,xhi-.018f,zhi-.003f,wr,wg,wb);
-                        (void)win;
-                    }
-                }
+
             } else if(t=='T') {
                 // Árbol low-poly: tronco y copa cúbica.
                 box(wx-CELL_SCALE*.12f,0,wz-CELL_SCALE*.12f,
