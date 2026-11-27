@@ -19,10 +19,10 @@ static C3D_Mtx projection;
 static int u_projection, u_modelView;
 static char map_grid[MAP_MAX][MAP_MAX];
 static int map_width, map_height, player_x, player_y;
-static float angle_x = 0.92f, angle_y = 0.35f;
-static float camera_target_yaw = 0.35f;
+static float angle_x = 0.22f, angle_y = 0.0f;
 static float player_fx, player_fy;
-static float player_angle, walk_phase, anim_time;
+static float player_vx, player_vy;
+static float player_angle, walk_phase, anim_time, player_anim_speed;
 
 /* Malla estatica combinada: se construye al iniciar y solo se regenera
    cuando el jugador cambia de tile. El personaje sigue siendo dinamico. */
@@ -34,7 +34,8 @@ static int world_vertex_count;
 static int building_world_mesh;
 static int mesh_origin_x, mesh_origin_y;
 static const float MESH_RECENTER_DISTANCE = 8.0f;
-static const float PLAYER_SPEED = 0.075f;
+static const float PLAYER_SPEED = 0.052f;
+static const float PLAYER_RUN_SPEED = 0.082f;
 static const float PLAYER_RADIUS = 0.28f;
 
 static const float cube_faces[6][4][3] = {
@@ -188,17 +189,48 @@ static int player_can_stand(float x, float y)
     return 1;
 }
 
-static void update_player(float dx, float dy)
+static float angle_lerp(float current, float target, float amount)
 {
-    float length = sqrtf(dx * dx + dy * dy);
-    if (length > 1.0f) { dx /= length; dy /= length; }
-    dx *= PLAYER_SPEED;
-    dy *= PLAYER_SPEED;
-    if (player_can_stand(player_fx + dx, player_fy)) player_fx += dx;
-    if (player_can_stand(player_fx, player_fy + dy)) player_fy += dy;
+    float d = atan2f(sinf(target-current), cosf(target-current));
+    return current + d * amount;
+}
+
+static void update_player(float dx, float dy, int run)
+{
+    float input_len = sqrtf(dx*dx + dy*dy);
+    if (input_len > 1.0f) { dx /= input_len; dy /= input_len; input_len = 1.0f; }
+
+    float speed = run ? PLAYER_RUN_SPEED : PLAYER_SPEED;
+    float target_x = dx * speed;
+    float target_y = dy * speed;
+    /* Aceleración y frenado progresivos, como en el juego original. */
+    player_vx += (target_x - player_vx) * (input_len > 0.01f ? 0.22f : 0.16f);
+    player_vy += (target_y - player_vy) * (input_len > 0.01f ? 0.22f : 0.16f);
+
+    if (player_can_stand(player_fx + player_vx, player_fy)) player_fx += player_vx;
+    else player_vx = 0.0f;
+    if (player_can_stand(player_fx, player_fy + player_vy)) player_fy += player_vy;
+    else player_vy = 0.0f;
+
+    float actual = sqrtf(player_vx*player_vx + player_vy*player_vy);
+    float max_speed = run ? PLAYER_RUN_SPEED : PLAYER_SPEED;
+    player_anim_speed = actual / max_speed;
+    if (player_anim_speed > 1.0f) player_anim_speed = 1.0f;
+
+    if (actual > 0.0015f) {
+        float target_angle = atan2f(player_vx, player_vy);
+        player_angle = angle_lerp(player_angle, target_angle, 0.20f);
+        walk_phase += 0.30f * (actual / PLAYER_SPEED);
+    } else {
+        player_anim_speed = 0.0f;
+        walk_phase *= 0.82f;
+        if (fabsf(player_vx) < 0.0005f) player_vx = 0.0f;
+        if (fabsf(player_vy) < 0.0005f) player_vy = 0.0f;
+    }
     player_x = (int)floorf(player_fx + 0.5f);
     player_y = (int)floorf(player_fy + 0.5f);
 }
+
 
 
 static void character_vertex(float x, float y, float z, float r, float g, float b)
@@ -206,105 +238,124 @@ static void character_vertex(float x, float y, float z, float r, float g, float 
     vertex(x, y, z, r, g, b);
 }
 
-// Cuboide del personaje: conserva la forma de bloques del modelo original.
-// Las piezas giran alrededor de su pivote y luego siguen la orientacion del jugador.
+/* Geometría del personaje original: piezas voxel con pivotes en cadera,
+   hombros y cuello. La transformación rota la pieza alrededor del pivote,
+   no alrededor del centro de cada cubo. */
 static void character_box(float ox, float oy, float oz,
                           float px, float py, float pz,
                           float sx, float sy, float sz,
-                          float rot_x, float rot_y,
+                          float rot_x, float rot_y, float rot_z,
                           float r, float g, float b)
 {
-    float cx = cosf(rot_x), sxr = sinf(rot_x);
-    float cy = cosf(rot_y), syr = sinf(rot_y);
-    for (int f = 0; f < 6; ++f) {
-        for (int k = 0; k < 6; ++k) {
-            int vi = (int[]){0,1,2,0,2,3}[k];
-            float lx = (cube_faces[f][vi][0] - 0.5f) * sx;
-            float ly = (cube_faces[f][vi][1] - 0.5f) * sy;
-            float lz = (cube_faces[f][vi][2] - 0.5f) * sz;
-            float ry = ly * cx - lz * sxr;
-            float rz = ly * sxr + lz * cx;
-            float rx = lx * cy + rz * syr;
-            float rz2 = -lx * syr + rz * cy;
-            float wx = ox + px + rx;
-            float wy = oy + py + ry;
-            float wz = oz + pz + rz2;
-            float shade = shade_face[f];
-            character_vertex(wx, wy, wz, r * shade, g * shade, b * shade);
+    float cx=cosf(rot_x), sxr=sinf(rot_x);
+    float cy=cosf(rot_y), syr=sinf(rot_y);
+    float cz=cosf(rot_z), szr=sinf(rot_z);
+    for (int f=0; f<6; ++f) {
+        for (int k=0; k<6; ++k) {
+            int vi=(int[]){0,1,2,0,2,3}[k];
+            float x=px+(cube_faces[f][vi][0]-.5f)*sx;
+            float y=py+(cube_faces[f][vi][1]-.5f)*sy;
+            float z=pz+(cube_faces[f][vi][2]-.5f)*sz;
+            float y1=y*cx-z*sxr, z1=y*sxr+z*cx;
+            float x2=x*cz-y1*szr, y2=x*szr+y1*cz;
+            float wx=x2*cy+z1*syr;
+            float wz=-x2*syr+z1*cy;
+            float shade=shade_face[f];
+            character_vertex(ox+wx,oy+y2,oz+wz,r*shade,g*shade,b*shade);
         }
     }
 }
 
 static void draw_original_character(void)
 {
-    const float s = CELL_SCALE;
-    const float base_x = (player_fx - mesh_origin_x) * s;
-    const float base_z = (player_fy - mesh_origin_y) * s;
-    const float skin_r=.95f, skin_g=.76f, skin_b=.60f;
-    const float shirt_r=.85f, shirt_g=.22f, shirt_b=.17f;
-    const float pants_r=.18f, pants_g=.38f, pants_b=.79f;
-    const float hair_r=.35f, hair_g=.22f, hair_b=.13f;
-    const float shoe_r=.14f, shoe_g=.14f, shoe_b=.17f;
-    const float step = sinf(walk_phase) * .48f;
+    const float s=CELL_SCALE;
+    const float bx=(player_fx-mesh_origin_x)*s;
+    const float bz=(player_fy-mesh_origin_y)*s;
 
-    // Piernas: 0.6 unidades de alto, pivote en la cadera.
-    character_box(base_x, 0, base_z,
-        -.017f*s, .60f*s, 0, .30f*s, .60f*s, .30f*s,
-        step, player_angle, pants_r,pants_g,pants_b);
-    character_box(base_x, 0, base_z,
-        .17f*s, .60f*s, 0, .30f*s, .60f*s, .30f*s,
-        -step, player_angle, pants_r,pants_g,pants_b);
-    // Zapatos negros en la base de cada pierna.
-    character_box(base_x, 0, base_z,
-        -.017f*s, .04f*s, .035f*s, .34f*s, .12f*s, .42f*s,
-        step, player_angle, shoe_r,shoe_g,shoe_b);
-    character_box(base_x, 0, base_z,
-        .17f*s, .04f*s, .035f*s, .34f*s, .12f*s, .42f*s,
-        -step, player_angle, shoe_r,shoe_g,shoe_b);
+    /* Paleta exacta de personaje_crear() en src/player/personaje.c */
+    const float shirt[3]={0xd9/255.0f,0x38/255.0f,0x2c/255.0f};
+    const float pants[3]={0x2f/255.0f,0x62/255.0f,0xc9/255.0f};
+    const float skin[3] ={0xf2/255.0f,0xc2/255.0f,0x30/255.0f};
+    const float hair[3] ={0x5a/255.0f,0x3a/255.0f,0x22/255.0f};
+    const float belt[3] ={0x3a/255.0f,0x2c/255.0f,0x22/255.0f};
+    const float shoe[3] ={0x24/255.0f,0x24/255.0f,0x2b/255.0f};
+    const float eye[3]  ={0x1b/255.0f,0x1b/255.0f,0x22/255.0f};
+    const float mouth[3]={0xb8/255.0f,0x48/255.0f,0x4a/255.0f};
 
-    // Torso y cinturón.
-    character_box(base_x, 0, base_z,
-        0, .90f*s, 0, .80f*s, .60f*s, .40f*s,
-        0, player_angle, shirt_r,shirt_g,shirt_b);
-    character_box(base_x, 0, base_z,
-        0, .65f*s, 0, .80f*s, .10f*s, .40f*s,
-        0, player_angle, hair_r, hair_g, hair_b);
+    float vel=player_anim_speed;
+    float step=sinf(walk_phase);
+    float quieto=1.0f-vel;
+    float balanceo=step*48.0f*vel*(3.14159265f/180.0f);
+    float rebote=fabsf(step)*0.07f*vel*s;
+    float respira=sinf(anim_time*2.2f)*0.012f*quieto*s;
+    float inclina=(5.0f*vel)* (3.14159265f/180.0f);
+    float giro_torso=step*7.0f*vel*(3.14159265f/180.0f);
+    float mira=sinf(anim_time*0.6f)*14.0f*quieto*(3.14159265f/180.0f);
+    float abre=(4.0f+sinf(anim_time*2.2f)*1.5f*quieto)*(3.14159265f/180.0f);
+    float root_y=rebote+respira;
 
-    // Brazos articulados: camisa arriba y manos color piel abajo.
-    character_box(base_x, 0, base_z,
-        -.50f*s, .90f*s, 0, .20f*s, .40f*s, .20f*s,
-        -step*.85f, player_angle, shirt_r,shirt_g,shirt_b);
-    character_box(base_x, 0, base_z,
-        -.50f*s, .60f*s, 0, .20f*s, .20f*s, .20f*s,
-        -step*.85f, player_angle, skin_r,skin_g,skin_b);
-    character_box(base_x, 0, base_z,
-        .50f*s, .90f*s, 0, .20f*s, .40f*s, .20f*s,
-        step*.85f, player_angle, shirt_r,shirt_g,shirt_b);
-    character_box(base_x, 0, base_z,
-        .50f*s, .60f*s, 0, .20f*s, .20f*s, .20f*s,
-        step*.85f, player_angle, skin_r,skin_g,skin_b);
+    /* Piernas: cada una gira desde la cadera, igual que la malla Vita. */
+    character_box(bx,root_y+.60f*s,bz,-.17f*s,-.30f*s,0,
+        .30f*s,.50f*s,.30f*s,balanceo,player_angle,0,
+        pants[0],pants[1],pants[2]);
+    character_box(bx,root_y+.60f*s,bz,.17f*s,-.30f*s,0,
+        .30f*s,.50f*s,.30f*s,-balanceo,player_angle,0,
+        pants[0],pants[1],pants[2]);
+    character_box(bx,root_y+.60f*s,bz,-.17f*s,-.55f*s,.015f*s,
+        .30f*s,.10f*s,.34f*s,balanceo,player_angle,0,
+        shoe[0],shoe[1],shoe[2]);
+    character_box(bx,root_y+.60f*s,bz,.17f*s,-.55f*s,.015f*s,
+        .30f*s,.10f*s,.34f*s,-balanceo,player_angle,0,
+        shoe[0],shoe[1],shoe[2]);
 
-    // Cabeza, pelo superior y flequillo frontal (+Z).
-    character_box(base_x, 0, base_z,
-        0, 1.50f*s, 0, .60f*s, .60f*s, .60f*s,
-        0, player_angle, skin_r,skin_g,skin_b);
-    character_box(base_x, 0, base_z,
-        0, 1.95f*s, 0, .60f*s, .10f*s, .60f*s,
-        0, player_angle, hair_r,hair_g,hair_b);
-    character_box(base_x, 0, base_z,
-        0, 1.85f*s, .25f*s, .60f*s, .10f*s, .10f*s,
-        0, player_angle, hair_r,hair_g,hair_b);
-    // Ojos y boca del rostro.
-    character_box(base_x, 0, base_z,
-        -.15f*s, 1.68f*s, .305f*s, .10f*s, .10f*s, .025f*s,
-        0, player_angle, .10f,.10f,.13f);
-    character_box(base_x, 0, base_z,
-        .15f*s, 1.68f*s, .305f*s, .10f*s, .10f*s, .025f*s,
-        0, player_angle, .10f,.10f,.13f);
-    character_box(base_x, 0, base_z,
-        0, 1.53f*s, .305f*s, .20f*s, .04f*s, .025f*s,
-        0, player_angle, .72f,.28f,.29f);
+    /* Torso, cabeza y brazos comparten el movimiento del tronco. */
+    float tx=bx, ty=root_y+.60f*s, tz=bz;
+    character_box(tx,ty,tz,0,-.30f*s,0,.80f*s,.60f*s,.40f*s,
+        inclina,player_angle,giro_torso,shirt[0],shirt[1],shirt[2]);
+    character_box(tx,ty,tz,0,-.55f*s,0,.80f*s,.10f*s,.40f*s,
+        inclina,player_angle,giro_torso,belt[0],belt[1],belt[2]);
+    character_box(tx,ty,tz,0,-.015f*s,.12f*s,.20f*s,.10f*s,.16f*s,
+        inclina,player_angle,giro_torso,skin[0],skin[1],skin[2]);
+
+    /* Brazos articulados: manga arriba y mano amarilla abajo. */
+    character_box(tx,ty,tz,-.50f*s,-.20f*s,0,.20f*s,.40f*s,.20f*s,
+        inclina-balanceo*.9f,player_angle,giro_torso+abre,
+        shirt[0],shirt[1],shirt[2]);
+    character_box(tx,ty,tz,-.50f*s,-.50f*s,0,.20f*s,.20f*s,.20f*s,
+        inclina-balanceo*.9f,player_angle,giro_torso+abre,
+        skin[0],skin[1],skin[2]);
+    character_box(tx,ty,tz,.50f*s,-.20f*s,0,.20f*s,.40f*s,.20f*s,
+        inclina+balanceo*.9f,player_angle,giro_torso-abre,
+        shirt[0],shirt[1],shirt[2]);
+    character_box(tx,ty,tz,.50f*s,-.50f*s,0,.20f*s,.20f*s,.20f*s,
+        inclina+balanceo*.9f,player_angle,giro_torso-abre,
+        skin[0],skin[1],skin[2]);
+
+    /* Cabeza de 6x6x6 voxels, flequillo, nuca y patillas originales. */
+    character_box(tx,ty,tz,0,.30f*s,0,.60f*s,.60f*s,.60f*s,
+        inclina,player_angle,mira,skin[0],skin[1],skin[2]);
+    character_box(tx,ty,tz,0,.55f*s,0,.60f*s,.10f*s,.60f*s,
+        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
+    character_box(tx,ty,tz,0,.45f*s,-.20f*s,.60f*s,.10f*s,.20f*s,
+        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
+    character_box(tx,ty,tz,-.25f*s,.45f*s,-.05f*s,.10f*s,.10f*s,.50f*s,
+        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
+    character_box(tx,ty,tz,.25f*s,.45f*s,-.05f*s,.10f*s,.10f*s,.50f*s,
+        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
+    character_box(tx,ty,tz,0,.35f*s,-.25f*s,.60f*s,.10f*s,.10f*s,
+        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
+    character_box(tx,ty,tz,0,.45f*s,.25f*s,.60f*s,.10f*s,.10f*s,
+        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
+
+    /* Ojos y boca en la cara frontal (+Z). */
+    character_box(tx,ty,tz,-.20f*s,.35f*s,.302f*s,.10f*s,.10f*s,.025f*s,
+        inclina,player_angle,mira,eye[0],eye[1],eye[2]);
+    character_box(tx,ty,tz,.20f*s,.35f*s,.302f*s,.10f*s,.10f*s,.025f*s,
+        inclina,player_angle,mira,eye[0],eye[1],eye[2]);
+    character_box(tx,ty,tz,0,.15f*s,.302f*s,.20f*s,.10f*s,.025f*s,
+        inclina,player_angle,mira,mouth[0],mouth[1],mouth[2]);
 }
+
 
 static void draw_city(void)
 {
@@ -501,14 +552,16 @@ int main(int argc,char **argv)
         circlePosition circle;
         hidCircleRead(&circle);
         u32 held = hidKeysHeld();
-        /* Cruceta para caminar; Circle Pad también sigue disponible. */
-        float move_x = (float)circle.dx / 156.0f;
-        float move_y = -(float)circle.dy / 156.0f;
-        if (held & KEY_RIGHT) move_x += 1.0f;
-        if (held & KEY_LEFT)  move_x -= 1.0f;
-        if (held & KEY_UP)    move_y += 1.0f;
-        if (held & KEY_DOWN)  move_y -= 1.0f;
-        update_player(move_x, move_y);
+        /* Movimiento relativo a la cámara: arriba siempre avanza hacia delante. */
+        float stick_x = (float)circle.dx / 156.0f;
+        float stick_y = -(float)circle.dy / 156.0f;
+        if (held & KEY_RIGHT) stick_x += 1.0f;
+        if (held & KEY_LEFT)  stick_x -= 1.0f;
+        if (held & KEY_UP)    stick_y += 1.0f;
+        if (held & KEY_DOWN)  stick_y -= 1.0f;
+        float move_x = sinf(angle_y)*stick_y + cosf(angle_y)*stick_x;
+        float move_y = cosf(angle_y)*stick_y - sinf(angle_y)*stick_x;
+        update_player(move_x, move_y, (held & KEY_B) != 0);
         /* La malla se conserva entre varios tiles. Solo se reconstruye al
            alejarse 8 tiles del centro, evitando pausas de CPU cada paso. */
         float mdx = player_fx - (float)mesh_origin_x;
@@ -517,33 +570,14 @@ int main(int argc,char **argv)
             if (!rebuild_world_mesh())
                 printf("Aviso: no se pudo actualizar la malla del sector.\\n");
         }
-        if (sqrtf(move_x * move_x + move_y * move_y) > 0.18f) {
-            player_angle = atan2f(move_x, move_y);
-            walk_phase += 0.30f;
-        } else {
-            walk_phase *= 0.82f;
-        }
         anim_time += 1.0f / 60.0f;
 
-        // La camara orbita alrededor del jugador y mira desde atras
-        // hacia la direccion en la que se esta desplazando.
-        float move_length = sqrtf(move_x * move_x + move_y * move_y);
-        if (move_length > 0.18f)
-            camera_target_yaw = atan2f(-move_x, move_y);
-
-        if(down&KEY_L)camera_target_yaw-=.18f;
-        if(down&KEY_R)camera_target_yaw+=.18f;
-        float yaw_delta = atan2f(sinf(camera_target_yaw-angle_y),
-                                 cosf(camera_target_yaw-angle_y));
-        angle_y += yaw_delta * .12f;
-        if(down&KEY_UP)angle_x-=.05f;
-        if(down&KEY_DOWN)angle_x+=.05f;
-        if(angle_x<.25f)angle_x=.25f;
-        if(angle_x>1.35f)angle_x=1.35f;
+        /* La cámara permanece detrás de la espalda y gira suavemente con él. */
+        angle_y = angle_lerp(angle_y, player_angle, 0.14f);
 
         C3D_Mtx model;
         Mtx_Identity(&model);
-        Mtx_Translate(&model,-(player_fx-mesh_origin_x)*CELL_SCALE,-.38f,-2.85f-(player_fy-mesh_origin_y)*CELL_SCALE,true);
+        Mtx_Translate(&model,-(player_fx-mesh_origin_x)*CELL_SCALE,-.10f,-.58f-(player_fy-mesh_origin_y)*CELL_SCALE,true);
         Mtx_RotateX(&model,angle_x,true);
         Mtx_RotateY(&model,angle_y,true);
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_projection,&projection);
