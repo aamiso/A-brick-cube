@@ -9,7 +9,8 @@
 #define CLEAR_COLOR 0x82B9E8FF
 #define DISPLAY_TRANSFER_FLAGS (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 #define MAP_MAX 400
-#define MAP_RADIUS 22
+#define CHUNK_SIZE 16
+#define RENDER_DISTANCE 26.0f
 #define CELL_SCALE 0.16f
 
 static DVLB_s *vshader_dvlb;
@@ -215,6 +216,8 @@ static void character_box(float ox, float oy, float oz,
 static void draw_original_character(void)
 {
     const float s = CELL_SCALE;
+    const float base_x = (player_fx - player_x) * s;
+    const float base_z = (player_fy - player_y) * s;
     const float skin_r=.95f, skin_g=.76f, skin_b=.60f;
     const float shirt_r=.85f, shirt_g=.22f, shirt_b=.17f;
     const float pants_r=.18f, pants_g=.38f, pants_b=.79f;
@@ -223,102 +226,134 @@ static void draw_original_character(void)
     const float step = sinf(walk_phase) * .48f;
 
     // Piernas: 0.6 unidades de alto, pivote en la cadera.
-    character_box((player_fx-player_x)*s, 0, (player_fy-player_y)*s,
+    character_box(base_x, 0, base_z,
         -.017f*s, .60f*s, 0, .30f*s, .60f*s, .30f*s,
         step, player_angle, pants_r,pants_g,pants_b);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         .17f*s, .60f*s, 0, .30f*s, .60f*s, .30f*s,
         -step, player_angle, pants_r,pants_g,pants_b);
     // Zapatos negros en la base de cada pierna.
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         -.017f*s, .04f*s, .035f*s, .34f*s, .12f*s, .42f*s,
         step, player_angle, shoe_r,shoe_g,shoe_b);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         .17f*s, .04f*s, .035f*s, .34f*s, .12f*s, .42f*s,
         -step, player_angle, shoe_r,shoe_g,shoe_b);
 
     // Torso y cinturón.
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         0, .90f*s, 0, .80f*s, .60f*s, .40f*s,
         0, player_angle, shirt_r,shirt_g,shirt_b);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         0, .65f*s, 0, .80f*s, .10f*s, .40f*s,
         0, player_angle, hair_r, hair_g, hair_b);
 
     // Brazos articulados: camisa arriba y manos color piel abajo.
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         -.50f*s, .90f*s, 0, .20f*s, .40f*s, .20f*s,
         -step*.85f, player_angle, shirt_r,shirt_g,shirt_b);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         -.50f*s, .60f*s, 0, .20f*s, .20f*s, .20f*s,
         -step*.85f, player_angle, skin_r,skin_g,skin_b);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         .50f*s, .90f*s, 0, .20f*s, .40f*s, .20f*s,
         step*.85f, player_angle, shirt_r,shirt_g,shirt_b);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         .50f*s, .60f*s, 0, .20f*s, .20f*s, .20f*s,
         step*.85f, player_angle, skin_r,skin_g,skin_b);
 
     // Cabeza, pelo superior y flequillo frontal (+Z).
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         0, 1.50f*s, 0, .60f*s, .60f*s, .60f*s,
         0, player_angle, skin_r,skin_g,skin_b);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         0, 1.95f*s, 0, .60f*s, .10f*s, .60f*s,
         0, player_angle, hair_r,hair_g,hair_b);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         0, 1.85f*s, .25f*s, .60f*s, .10f*s, .10f*s,
         0, player_angle, hair_r,hair_g,hair_b);
     // Ojos y boca del rostro.
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         -.15f*s, 1.68f*s, .305f*s, .10f*s, .10f*s, .025f*s,
         0, player_angle, .10f,.10f,.13f);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         .15f*s, 1.68f*s, .305f*s, .10f*s, .10f*s, .025f*s,
         0, player_angle, .10f,.10f,.13f);
-    character_box(player_fx*s, 0, player_fy*s,
+    character_box(base_x, 0, base_z,
         0, 1.53f*s, .305f*s, .20f*s, .04f*s, .025f*s,
         0, player_angle, .72f,.28f,.29f);
 }
 
 static void draw_city(void)
 {
-    int x0=player_x-MAP_RADIUS, x1=player_x+MAP_RADIUS;
-    int y0=player_y-MAP_RADIUS, y1=player_y+MAP_RADIUS;
-    if(x0<0)x0=0; if(y0<0)y0=0;
-    if(x1>=map_width)x1=map_width-1;
-    if(y1>=map_height)y1=map_height-1;
+    /*
+     * El mapa completo permanece cargado en map_grid. La ciudad se recorre
+     * por sectores de 16x16: solo se generan vertices para los sectores
+     * cercanos al jugador. Esto es distancia de dibujado, no un limite
+     * de exploracion; el jugador puede recorrer los 252x252 tiles.
+     */
+    const float max_dist2 = RENDER_DISTANCE * RENDER_DISTANCE;
+    const float chunk_radius = (float)CHUNK_SIZE * 0.7072f;
+    const int chunks_x = (map_width + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    const int chunks_y = (map_height + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
     C3D_ImmDrawBegin(GPU_TRIANGLES);
-    for(int my=y0;my<=y1;++my) {
-        for(int mx=x0;mx<=x1;++mx) {
-            char t=map_at(mx,my);
-            float wx=(mx-player_x)*CELL_SCALE;
-            float wz=(my-player_y)*CELL_SCALE;
-            float xlo=wx-CELL_SCALE*.5f, xhi=wx+CELL_SCALE*.5f;
-            float zlo=wz-CELL_SCALE*.5f, zhi=wz+CELL_SCALE*.5f;
+    for (int cy = 0; cy < chunks_y; ++cy) {
+        for (int cx = 0; cx < chunks_x; ++cx) {
+            int bx = cx * CHUNK_SIZE;
+            int by = cy * CHUNK_SIZE;
+            int ex = bx + CHUNK_SIZE;
+            int ey = by + CHUNK_SIZE;
+            if (ex > map_width) ex = map_width;
+            if (ey > map_height) ey = map_height;
 
-            float gr=.39f,gg=.70f,gb=.29f;
-            if(t=='='){gr=.29f;gg=.30f;gb=.34f;}
-            else if(t=='S'){gr=.70f;gg=.69f;gb=.65f;}
-            else if(t=='W'){gr=.14f;gg=.42f;gb=.78f;}
-            // No dibujar suelo oculto bajo edificios o arboles.
-            if (!is_building(t) && t != 'T')
-                map_quad(xlo,-.02f,zlo,xhi,zhi,gr,gg,gb);
+            // Culling de sector usando el punto mas cercano de su rectangulo.
+            float near_x = player_fx;
+            float near_y = player_fy;
+            if (near_x < (float)bx) near_x = (float)bx;
+            if (near_x > (float)(ex - 1)) near_x = (float)(ex - 1);
+            if (near_y < (float)by) near_y = (float)by;
+            if (near_y > (float)(ey - 1)) near_y = (float)(ey - 1);
+            float ndx = near_x - player_fx;
+            float ndy = near_y - player_fy;
+            if (ndx * ndx + ndy * ndy > max_dist2) continue;
 
-            if(is_building(t)) {
-                float r,g,b,h;
-                building_color(t,&r,&g,&b,&h);
-                box(xlo,0.0f,zlo,xhi,h*CELL_SCALE,zhi,r,g,b,mx,my,t);
+            for (int my = by; my < ey; ++my) {
+                for (int mx = bx; mx < ex; ++mx) {
+                    float dx = (float)mx - player_fx;
+                    float dy = (float)my - player_fy;
+                    if (dx * dx + dy * dy > max_dist2) continue;
 
-            } else if(t=='T') {
-                // Árbol low-poly: tronco y copa cúbica.
-                box(wx-CELL_SCALE*.12f,0,wz-CELL_SCALE*.12f,
-                    wx+CELL_SCALE*.12f,CELL_SCALE*1.0f,zhi,
-                    .38f,.22f,.10f,mx,my,'#');
-                box(xlo+.012f,CELL_SCALE*.85f,zlo+.012f,
-                    xhi-.012f,CELL_SCALE*2.7f,zhi-.012f,
-                    .12f,.48f,.16f,mx,my,'#');
+                    char t = map_at(mx, my);
+                    float wx = (mx - player_x) * CELL_SCALE;
+                    float wz = (my - player_y) * CELL_SCALE;
+                    float xlo = wx - CELL_SCALE * .5f;
+                    float xhi = wx + CELL_SCALE * .5f;
+                    float zlo = wz - CELL_SCALE * .5f;
+                    float zhi = wz + CELL_SCALE * .5f;
+
+                    float gr = .39f, gg = .70f, gb = .29f;
+                    if (t == '=') { gr = .29f; gg = .30f; gb = .34f; }
+                    else if (t == 'S') { gr = .70f; gg = .69f; gb = .65f; }
+                    else if (t == 'W') { gr = .14f; gg = .42f; gb = .78f; }
+
+                    if (!is_building(t) && t != 'T')
+                        map_quad(xlo, -.02f, zlo, xhi, zhi, gr, gg, gb);
+
+                    if (is_building(t)) {
+                        float r, g, b, h;
+                        building_color(t, &r, &g, &b, &h);
+                        box(xlo, 0.0f, zlo, xhi, h * CELL_SCALE, zhi,
+                            r, g, b, mx, my, t);
+                    } else if (t == 'T') {
+                        box(wx - CELL_SCALE * .12f, 0, wz - CELL_SCALE * .12f,
+                            wx + CELL_SCALE * .12f, CELL_SCALE, wz + CELL_SCALE * .12f,
+                            .38f, .22f, .10f, mx, my, '#');
+                        box(xlo + .012f, CELL_SCALE * .85f, zlo + .012f,
+                            xhi - .012f, CELL_SCALE * 2.7f, zhi - .012f,
+                            .12f, .48f, .16f, mx, my, '#');
+                    }
+                }
             }
         }
     }
@@ -380,7 +415,8 @@ int main(int argc,char **argv)
     printf("A BRICK CUBE - CIUDAD 3DS\n");
     printf("Mapa original: %d x %d\n",map_width,map_height);
     printf("Inicio original: %d, %d\n",player_x,player_y);
-    printf("Vista local: %d x %d celdas\n",MAP_RADIUS*2+1,MAP_RADIUS*2+1);
+    printf("Ciudad completa: %d x %d tiles\n", map_width, map_height);
+    printf("Render por sectores: %d x %d tiles\n", CHUNK_SIZE, CHUNK_SIZE);
     player_fx = (float)player_x;
     player_fy = (float)player_y;
     printf("Stick: mover jugador\n");
