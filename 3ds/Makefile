@@ -30,6 +30,7 @@ LIBDIRS     := $(CTRULIB)
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
 export OUTPUT   := $(CURDIR)/$(TARGET)
+export SHADER_HEADER := $(CURDIR)/$(BUILD)/vshader_shbin.h
 export TOPDIR   := $(CURDIR)
 export VPATH    := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR  := $(CURDIR)/$(BUILD)
@@ -61,6 +62,13 @@ clean:
 else
 
 DEPENDS := $(OFILES:.o=.d)
+
+# Compilar el shader PICA200 y generar un encabezado C incluido por main.c.
+$(SHADER_HEADER): $(TOPDIR)/source/vshader.v.pica | $(DEPSDIR)
+	@picasso -o $(TOPDIR)/$(BUILD)/vshader.shbin $<
+	@python3 $(TOPDIR)/tools/bin2header.py $(TOPDIR)/$(BUILD)/vshader.shbin $@ vshader_shbin
+
+main.o: $(SHADER_HEADER)
 
 icon.png :
 	@python3 -c "import struct, zlib; w=h=48; raw=b''.join(b'\x00'+b'\x30\x70\xc0\xff'*w for _ in range(h)); png=b'\x89PNG\r\n\x1a\n'+b''.join(struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff) for t,d in [(b'IHDR',struct.pack('>IIBBBBB',w,h,8,6,0,0,0)),(b'IDAT',zlib.compress(raw)),(b'IEND',b'')]); open('$@','wb').write(png)"
