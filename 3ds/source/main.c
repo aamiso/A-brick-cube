@@ -1,32 +1,58 @@
 #include <3ds.h>
+#include <citro3d.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-int main(void) {
+static void probar_romfs(void) {
+    Result rc = romfsInit();
+    if (R_FAILED(rc)) {
+        printf("romfsInit fallo: 0x%08lX\n", rc);
+        return;
+    }
+
+    FILE* f = fopen("romfs:/mapas/ciudad.txt", "rb");
+    if (!f) {
+        printf("No se abrio romfs:/mapas/ciudad.txt\n");
+        romfsExit();
+        return;
+    }
+
+    char linea[128] = {0};
+    if (fgets(linea, sizeof(linea), f) != NULL) {
+        printf("Mapa leido: %s\n", linea);
+    } else {
+        printf("Archivo vacio o sin salto de linea\n");
+    }
+
+    fclose(f);
+    romfsExit();
+}
+
+int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
+
     gfxInitDefault();
     consoleInit(GFX_TOP, NULL);
-    romfsInit();
 
-    printf("A Brick Cube 3DS - Prueba inicial\n\n");
+    printf("A Brick Cube 3DS - Base port\n");
+    printf("Presiona START para salir.\n\n");
 
-    FILE *f = fopen("romfs:/mapas/ciudad.txt", "r");
-    if (f) {
-        printf("[OK] ciudad.txt cargado desde romfs!\n");
-        fclose(f);
-    } else {
-        printf("[ERROR] No se encontro ciudad.txt\n");
-    }
-
-    printf("\nPresiona START para salir.\n");
+    probar_romfs();
 
     while (aptMainLoop()) {
-        gspWaitForVBlank();
-        gfxSwapBuffers();
         hidScanInput();
+        u32 kDown = hidKeysDown();
 
-        if (hidKeysDown() & KEY_START) break;
+        if (kDown & KEY_START) {
+            break;
+        }
+
+        gfxFlushBuffers();
+        gfxSwapBuffers();
+        gspWaitForVBlank();
     }
 
-    romfsExit();
     gfxExit();
     return 0;
 }
