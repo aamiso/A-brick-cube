@@ -10,7 +10,6 @@
 #define DISPLAY_TRANSFER_FLAGS (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 #define MAP_MAX 400
 #define CHUNK_SIZE 16
-#define RENDER_DISTANCE 26.0f
 #define CELL_SCALE 0.16f
 
 static DVLB_s *vshader_dvlb;
@@ -20,7 +19,7 @@ static C3D_Mtx projection;
 static int u_projection, u_modelView;
 static char map_grid[MAP_MAX][MAP_MAX];
 static int map_width, map_height, player_x, player_y;
-static float angle_x = 0.82f, angle_y = 0.35f;
+static float angle_x = 0.92f, angle_y = 0.35f;
 static float camera_target_yaw = 0.35f;
 static float player_fx, player_fy;
 static float player_angle, walk_phase, anim_time;
@@ -309,80 +308,69 @@ static void draw_original_character(void)
 
 static void draw_city(void)
 {
-    /*
-     * El mapa completo permanece cargado en map_grid. La ciudad se recorre
-     * por sectores de 16x16: solo se generan vertices para los sectores
-     * cercanos al jugador. Esto es distancia de dibujado, no un limite
-     * de exploracion; el jugador puede recorrer los 252x252 tiles.
-     */
-    const float max_dist2 = RENDER_DISTANCE * RENDER_DISTANCE;
-    const float chunk_radius = (float)CHUNK_SIZE * 0.7072f;
-    const int chunks_x = (map_width + CHUNK_SIZE - 1) / CHUNK_SIZE;
-    const int chunks_y = (map_height + CHUNK_SIZE - 1) / CHUNK_SIZE;
-
+    /* Toda la ciudad se construye de una vez. Los suelos y edificios
+       contiguos del mismo tipo se fusionan en rectángulos para reducir
+       drásticamente vértices y llamadas de dibujo. */
+    static unsigned char used[MAP_MAX][MAP_MAX];
+    memset(used, 0, sizeof(used));
     if (!building_world_mesh) C3D_ImmDrawBegin(GPU_TRIANGLES);
-    for (int cy = 0; cy < chunks_y; ++cy) {
-        for (int cx = 0; cx < chunks_x; ++cx) {
-            int bx = cx * CHUNK_SIZE;
-            int by = cy * CHUNK_SIZE;
-            int ex = bx + CHUNK_SIZE;
-            int ey = by + CHUNK_SIZE;
-            if (ex > map_width) ex = map_width;
-            if (ey > map_height) ey = map_height;
 
-            // Culling de sector usando el punto mas cercano de su rectangulo.
-            float near_x = player_fx;
-            float near_y = player_fy;
-            if (near_x < (float)bx) near_x = (float)bx;
-            if (near_x > (float)(ex - 1)) near_x = (float)(ex - 1);
-            if (near_y < (float)by) near_y = (float)by;
-            if (near_y > (float)(ey - 1)) near_y = (float)(ey - 1);
-            float ndx = near_x - player_fx;
-            float ndy = near_y - player_fy;
-            if (ndx * ndx + ndy * ndy > max_dist2) continue;
+    for (int my = 0; my < map_height; ++my) {
+        for (int mx = 0; mx < map_width; ++mx) {
+            char t = map_at(mx, my);
+            if (used[my][mx]) continue;
 
-            for (int my = by; my < ey; ++my) {
-                for (int mx = bx; mx < ex; ++mx) {
-                    float dx = (float)mx - player_fx;
-                    float dy = (float)my - player_fy;
-                    if (dx * dx + dy * dy > max_dist2) continue;
+            float wx = (mx - mesh_origin_x) * CELL_SCALE;
+            float wz = (my - mesh_origin_y) * CELL_SCALE;
+            float half = CELL_SCALE * .5f;
 
-                    char t = map_at(mx, my);
-                    float wx = (mx - player_x) * CELL_SCALE;
-                    float wz = (my - player_y) * CELL_SCALE;
-                    float xlo = wx - CELL_SCALE * .5f;
-                    float xhi = wx + CELL_SCALE * .5f;
-                    float zlo = wz - CELL_SCALE * .5f;
-                    float zhi = wz + CELL_SCALE * .5f;
+            if (t == 'T') {
+                used[my][mx] = 1;
+                box(wx-half*.24f, 0, wz-half*.24f,
+                    wx+half*.24f, CELL_SCALE, wz+half*.24f,
+                    .38f,.22f,.10f,-1,-1,'#');
+                box(wx-half, CELL_SCALE*.85f, wz-half,
+                    wx+half, CELL_SCALE*2.7f, wz+half,
+                    .12f,.48f,.16f,-1,-1,'#');
+                continue;
+            }
 
-                    float gr = .39f, gg = .70f, gb = .29f;
-                    if (t == '=') { gr = .29f; gg = .30f; gb = .34f; }
-                    else if (t == 'S') { gr = .70f; gg = .69f; gb = .65f; }
-                    else if (t == 'W') { gr = .14f; gg = .42f; gb = .78f; }
+            int w = 1, h = 1;
+            while (mx+w < map_width && !used[my][mx+w] &&
+                   map_at(mx+w,my) == t && t != 'P') w++;
+            for (;;) {
+                if (my+h >= map_height || t == 'P') break;
+                int same = 1;
+                for (int k=0;k<w;k++)
+                    if (used[my+h][mx+k] || map_at(mx+k,my+h) != t) { same=0; break; }
+                if (!same) break;
+                h++;
+            }
+            for (int yy=0; yy<h; ++yy)
+                for (int xx=0; xx<w; ++xx) used[my+yy][mx+xx] = 1;
 
-                    if (!is_building(t) && t != 'T')
-                        map_quad(xlo, -.02f, zlo, xhi, zhi, gr, gg, gb);
+            float xlo = wx-half;
+            float zlo = wz-half;
+            float xhi = wx + (w-.5f)*CELL_SCALE;
+            float zhi = wz + (h-.5f)*CELL_SCALE;
 
-                    if (is_building(t)) {
-                        float r, g, b, h;
-                        building_color(t, &r, &g, &b, &h);
-                        box(xlo, 0.0f, zlo, xhi, h * CELL_SCALE, zhi,
-                            r, g, b, mx, my, t);
-                    } else if (t == 'T') {
-                        box(wx - CELL_SCALE * .12f, 0, wz - CELL_SCALE * .12f,
-                            wx + CELL_SCALE * .12f, CELL_SCALE, wz + CELL_SCALE * .12f,
-                            .38f, .22f, .10f, mx, my, '#');
-                        box(xlo + .012f, CELL_SCALE * .85f, zlo + .012f,
-                            xhi - .012f, CELL_SCALE * 2.7f, zhi - .012f,
-                            .12f, .48f, .16f, mx, my, '#');
-                    }
-                }
+            float gr=.39f, gg=.70f, gb=.29f;
+            if (t=='=') { gr=.29f; gg=.30f; gb=.34f; }
+            else if (t=='S') { gr=.70f; gg=.69f; gb=.65f; }
+            else if (t=='W') { gr=.14f; gg=.42f; gb=.78f; }
+
+            if (!is_building(t))
+                map_quad(xlo,-.02f,zlo,xhi,zhi,gr,gg,gb);
+
+            if (is_building(t)) {
+                float r,g,b,bh;
+                building_color(t,&r,&g,&b,&bh);
+                /* Un solo prisma por bloque contiguo, sin caras internas. */
+                box(xlo,0,zlo,xhi,bh*CELL_SCALE,zhi,r,g,b,-1,-1,'#');
             }
         }
     }
-    if (!building_world_mesh) {
-        C3D_ImmDrawEnd();
-    }
+    if (!building_world_mesh) C3D_ImmDrawEnd();
 }
 
 /* Convierte el escenario estatico en dos buffers GPU reutilizables.
@@ -512,8 +500,14 @@ int main(int argc,char **argv)
         if(down&KEY_START)break;
         circlePosition circle;
         hidCircleRead(&circle);
+        u32 held = hidKeysHeld();
+        /* Cruceta para caminar; Circle Pad también sigue disponible. */
         float move_x = (float)circle.dx / 156.0f;
         float move_y = -(float)circle.dy / 156.0f;
+        if (held & KEY_RIGHT) move_x += 1.0f;
+        if (held & KEY_LEFT)  move_x -= 1.0f;
+        if (held & KEY_UP)    move_y += 1.0f;
+        if (held & KEY_DOWN)  move_y -= 1.0f;
         update_player(move_x, move_y);
         /* La malla se conserva entre varios tiles. Solo se reconstruye al
            alejarse 8 tiles del centro, evitando pausas de CPU cada paso. */
@@ -537,8 +531,8 @@ int main(int argc,char **argv)
         if (move_length > 0.18f)
             camera_target_yaw = atan2f(-move_x, move_y);
 
-        if(down&KEY_LEFT)camera_target_yaw-=.18f;
-        if(down&KEY_RIGHT)camera_target_yaw+=.18f;
+        if(down&KEY_L)camera_target_yaw-=.18f;
+        if(down&KEY_R)camera_target_yaw+=.18f;
         float yaw_delta = atan2f(sinf(camera_target_yaw-angle_y),
                                  cosf(camera_target_yaw-angle_y));
         angle_y += yaw_delta * .12f;
@@ -549,7 +543,7 @@ int main(int argc,char **argv)
 
         C3D_Mtx model;
         Mtx_Identity(&model);
-        Mtx_Translate(&model,-(player_fx-mesh_origin_x)*CELL_SCALE,-.48f,-4.25f-(player_fy-mesh_origin_y)*CELL_SCALE,true);
+        Mtx_Translate(&model,-(player_fx-mesh_origin_x)*CELL_SCALE,-.38f,-2.85f-(player_fy-mesh_origin_y)*CELL_SCALE,true);
         Mtx_RotateX(&model,angle_x,true);
         Mtx_RotateY(&model,angle_y,true);
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_projection,&projection);
