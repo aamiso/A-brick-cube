@@ -10,12 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: devkitpro/devkitarm:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
+      CTRULIB: /opt/devkitpro/libctru
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Compilar .3dsx
         run: |
+          export PATH="$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH"
           cd 3ds
           make -j$(nproc)
 
