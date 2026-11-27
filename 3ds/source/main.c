@@ -424,7 +424,7 @@ int main(int argc,char **argv)
         Mtx_Identity(&model);
         Mtx_RotateX(&model,angle_x,true);
         Mtx_RotateY(&model,angle_y,true);
-        Mtx_Translate(&model,0.0f,-.75f,6.2f,true);
+        Mtx_Translate(&model,0.0f,-.75f,-6.2f,true);
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_projection,&projection);
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_modelView,&model);
 
