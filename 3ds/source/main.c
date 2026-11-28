@@ -1,619 +1,353 @@
+// A Brick Cube Vita - Fase 5: ciudad voxel con casas, banco y café (modelos), calles con detalle y personaje animado (data/mapas/ciudad.txt)
+//
+// Controles:
+//   Stick izquierdo = caminar (o manejar)
+//   R = correr (mantener)    X = saltar    L = cambiar de cámara (normal / sobre el hombro)
+//   TRIÁNGULO = subir / bajar del carro    CUADRADO = freno de mano
+//   Stick derecho   = girar la cámara (izq/der) y subirla o bajarla (arriba/abajo)
+//   START           = salir
+
 #include <3ds.h>
 #include <citro3d.h>
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include "vshader_shbin.h"
-
-#define CLEAR_COLOR 0x82B9E8FF
-#define DISPLAY_TRANSFER_FLAGS (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
-#define MAP_MAX 400
-#define CHUNK_SIZE 16
-#define CELL_SCALE 0.16f
-
-static DVLB_s *vshader_dvlb;
-static shaderProgram_s program;
-static C3D_RenderTarget *target;
-static C3D_Mtx projection;
-static int u_projection, u_modelView;
-static char map_grid[MAP_MAX][MAP_MAX];
-static int map_width, map_height, player_x, player_y;
-static float angle_x = 0.22f, angle_y = 0.0f;
-static float player_fx, player_fy;
-static float player_vx, player_vy;
-static float player_angle, walk_phase, anim_time, player_anim_speed;
-
-/* Malla estatica combinada: se construye al iniciar y solo se regenera
-   cuando el jugador cambia de tile. El personaje sigue siendo dinamico. */
-typedef struct { float x, y, z, r, g, b, a; } WorldVertex;
-static WorldVertex *build_vertices;
-static size_t build_count, build_capacity;
-static void *world_positions, *world_colors;
-static int world_vertex_count;
-static int building_world_mesh;
-static int mesh_origin_x, mesh_origin_y;
-static const float MESH_RECENTER_DISTANCE = 8.0f;
-static const float PLAYER_SPEED = 0.052f;
-static const float PLAYER_RUN_SPEED = 0.082f;
-static const float PLAYER_RADIUS = 0.28f;
-
-static const float cube_faces[6][4][3] = {
-    {{0,1,0},{1,1,0},{1,1,1},{0,1,1}},
-    {{0,0,1},{1,0,1},{1,1,1},{0,1,1}},
-    {{0,0,0},{1,0,0},{1,1,0},{0,1,0}},
-    {{1,0,0},{1,0,1},{1,1,1},{1,1,0}},
-    {{0,0,0},{0,0,1},{0,1,1},{0,1,0}},
-    {{0,0,0},{0,0,1},{1,0,1},{1,0,0}}
-};
-static const int neighbor[6][2] = {{0,-1},{0,1},{0,-1},{1,0},{-1,0},{0,1}};
-static const float shade_face[6] = {1.0f,0.88f,0.68f,0.78f,0.84f,0.60f};
-
-static char map_at(int x, int y)
-{
-    if (x < 0 || y < 0 || x >= map_width || y >= map_height) return ' ';
-    return map_grid[y][x];
+#include "vitaGL.h"
+#define SCE_CTRL_START (1u<<0)
+#define SCE_CTRL_CROSS (1u<<1)
+#define SCE_CTRL_CIRCLE (1u<<2)
+#define SCE_CTRL_TRIANGLE (1u<<3)
+#define SCE_CTRL_SQUARE (1u<<4)
+#define SCE_CTRL_RTRIGGER (1u<<5)
+#define SCE_CTRL_LTRIGGER (1u<<6)
+typedef struct { unsigned buttons; unsigned char lx,ly; } SceCtrlData;
+static DVLB_s *brick_shader;
+static shaderProgram_s brick_program;
+static C3D_RenderTarget *brick_target;
+static int brick_u_projection, brick_u_modelview;
+static const u32 brick_transfer_flags =
+ GX_TRANSFER_FLIP_VERT(0)|GX_TRANSFER_OUT_TILED(0)|GX_TRANSFER_RAW_COPY(0)|
+ GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8)|GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8)|
+ GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO);
+void brick3ds_set_identity_uniforms(void){C3D_Mtx m;Mtx_Identity(&m);C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,brick_u_projection,&m);C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,brick_u_modelview,&m);}
+void brick3ds_frame_begin(void){C3D_FrameBegin(C3D_FRAME_SYNCDRAW);C3D_FrameDrawOn(brick_target);}
+void brick3ds_present(void){C3D_FrameEnd(0);}
+void brick3ds_clear(float r,float g,float b,float a,unsigned mask){u32 rgba=C3D_RGBA8((u8)(r*255),(u8)(g*255),(u8)(b*255),(u8)(a*255));u32 f=0;if(mask&GL_COLOR_BUFFER_BIT)f|=C3D_CLEAR_COLOR;if(mask&GL_DEPTH_BUFFER_BIT)f|=C3D_CLEAR_DEPTH;C3D_RenderTargetClear(brick_target,f,rgba,0);}
+static int brick_renderer_init(void){
+ if(!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE))return 0;
+ brick_target=C3D_RenderTargetCreate(240,400,GPU_RB_RGBA8,GPU_RB_DEPTH24_STENCIL8);if(!brick_target)return 0;
+ C3D_RenderTargetSetOutput(brick_target,GFX_TOP,GFX_LEFT,brick_transfer_flags);
+ extern const u8 vshader_shbin[];extern const u32 vshader_shbin_size;
+ brick_shader=DVLB_ParseFile((u32*)vshader_shbin,vshader_shbin_size);if(!brick_shader)return 0;
+ shaderProgramInit(&brick_program);shaderProgramSetVsh(&brick_program,&brick_shader->DVLE[0]);C3D_BindProgram(&brick_program);
+ brick_u_projection=shaderInstanceGetUniformLocation(brick_program.vertexShader,"projection");
+ brick_u_modelview=shaderInstanceGetUniformLocation(brick_program.vertexShader,"modelView");
+ C3D_AttrInfo *a=C3D_GetAttrInfo();AttrInfo_Init(a);AttrInfo_AddLoader(a,0,GPU_FLOAT,3);AttrInfo_AddLoader(a,1,GPU_FLOAT,4);
+ C3D_TexEnv *e=C3D_GetTexEnv(0);C3D_TexEnvInit(e);C3D_TexEnvSrc(e,C3D_Both,GPU_PRIMARY_COLOR,0,0);C3D_TexEnvFunc(e,C3D_Both,GPU_REPLACE);
+ C3D_DepthMap(true,-1.0f,0.0f);C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);C3D_CullFace(GPU_CULL_NONE);return 1;
 }
+static void brick_renderer_exit(void){if(brick_target)C3D_RenderTargetDelete(brick_target);shaderProgramFree(&brick_program);if(brick_shader)DVLB_Free(brick_shader);C3D_Fini();}
 
-static int load_city_map(void)
-{
-    FILE *f = fopen("romfs:/mapas/ciudad.txt", "rb");
-    if (!f) return 0;
-    char line[MAP_MAX + 8];
-    map_width = map_height = 0;
-    player_x = player_y = -1;
-    memset(map_grid, ' ', sizeof(map_grid));
-    while (fgets(line, sizeof(line), f) && map_height < MAP_MAX) {
-        if (line[0] == '#') continue;
-        size_t n = strcspn(line, "\r\n");
-        if (n == 0) continue;
-        if (n > MAP_MAX) n = MAP_MAX;
-        if ((int)n > map_width) map_width = (int)n;
-        for (size_t x = 0; x < n; ++x) {
-            map_grid[map_height][x] = line[x];
-            if (line[x] == 'P') { player_x = (int)x; player_y = map_height; }
-        }
-        ++map_height;
-    }
-    fclose(f);
-    return map_width > 0 && map_height > 0 && player_x >= 0 && player_y >= 0;
-}
+#include "core/entrada.h"
+#include "engine/cubo.h"
+#include "engine/camara.h"
+#include "player/jugador.h"
+#include "world/suelo.h"
+#include "world/ciudad.h"
+#include "world/frontera.h"
+#include "world/terreno.h"
+#include "world/vehiculos.h"
+#include "world/npcs.h"
+#include "world/escombros.h"
+#include "world/reloj.h"
+#include "world/misiones.h"
+#include "ui/minimapa.h"
+#include "world/interior.h"
+#include "world/lugares.h"
+#include "ui/ui.h"
+#include "ui/dialogo.h"
+#include <math.h>
+#include <stdio.h>
 
-static void vertex(float x, float y, float z, float r, float g, float b)
-{
-    if (building_world_mesh) {
-        if (build_count >= build_capacity) {
-            size_t next = build_capacity ? build_capacity * 2 : 16384;
-            WorldVertex *grown = (WorldVertex *)realloc(build_vertices, next * sizeof(WorldVertex));
-            if (!grown) return;
-            build_vertices = grown;
-            build_capacity = next;
-        }
-        WorldVertex *v = &build_vertices[build_count++];
-        v->x=x; v->y=y; v->z=z; v->r=r; v->g=g; v->b=b; v->a=1.0f;
-        return;
-    }
-    C3D_ImmSendAttrib(x, y, z, 1.0f);
-    C3D_ImmSendAttrib(r, g, b, 1.0f);
-}
+int main(void) {
+    gfxInitDefault(); consoleInit(GFX_BOTTOM,NULL);
+    if(R_FAILED(romfsInit())) { printf("No se pudo montar ROMFS.\\n"); gfxExit(); return 1; }
+    if(!brick_renderer_init()) { printf("No se pudo iniciar Citro3D/shader.\\n"); romfsExit(); gfxExit(); return 1; }
+    cubo_construir();
 
-static void quad(const float p[4][3], float r, float g, float b, float shade)
-{
-    static const int order[6] = {0,1,2,0,2,3};
-    for (int i = 0; i < 6; ++i) {
-        const float *v = p[order[i]];
-        vertex(v[0],v[1],v[2],r*shade,g*shade,b*shade);
-    }
-}
+    // Lee el mapa (si no lo encuentra, usa uno chiquito incluido en el juego)
+    ciudad_cargar("romfs:/mapas/ciudad.txt");
 
-static void map_quad(float x0,float y,float z0,float x1,float z1,float r,float g,float b)
-{
-    const float p[4][3]={{x0,y,z0},{x1,y,z0},{x1,y,z1},{x0,y,z1}};
-    quad(p,r,g,b,1.0f);
-}
+    Jugador jugador;
+    Camara camara;
+    jugador_iniciar(&jugador);
+    ciudad_inicio(&jugador.x, &jugador.z); // empieza donde dice la P del mapa
+    ciudad_precalentar(jugador.x, jugador.z);
+    camara_iniciar(&camara);
+    vehiculos_iniciar(jugador.x, jugador.z);
+    npcs_iniciar(jugador.x, jugador.z);
+    int en_carro = -1;
+    int hablando = -1;
+    int oferta = 0;                        // 1 mientras un NPC ofrece una misión
+    char dentro = 0;                       // letra del lugar donde estamos (0 = en la calle)
+    int hablando_i = -1, fase_f = 0, fund = 0, pend_salir = 0, pend_puerta = 0;
+    char pend_l = 0;
+    float gx = 0, gz = 0, gsuelo = 0;      // dónde estaba en la calle
+    Camara cam_guardada;
+    unsigned prev = 0;
+    int anim = 0, anim_n = -1, anim_sube = 0;     // animación de subir / bajar del carro
+    float ax0 = 0, az0 = 0, ax1 = 0, az1 = 0;
 
-static void box(float x0,float y0,float z0,float x1,float y1,float z1,
-                float r,float g,float b,int map_x,int map_y,char type)
-{
-    for (int f=0;f<6;++f) {
-        if (f==5) continue; // la cara inferior nunca se ve
-        if (f==1 && map_at(map_x,map_y+1)==type) continue;
-        if (f==2 && map_at(map_x,map_y-1)==type) continue;
-        if (f==3 && map_at(map_x+1,map_y)==type) continue;
-        if (f==4 && map_at(map_x-1,map_y)==type) continue;
-        float p[4][3];
-        for(int k=0;k<4;++k) {
-            p[k][0]=x0+cube_faces[f][k][0]*(x1-x0);
-            p[k][1]=y0+cube_faces[f][k][1]*(y1-y0);
-            p[k][2]=z0+cube_faces[f][k][2]*(z1-z0);
-        }
-        quad(p,r,g,b,shade_face[f]);
-    }
-}
-
-static int is_building(char t)
-{
-    return strchr("CGBA LFNDEHJKXO IQZsRcqYMVU", t) != NULL && t != ' ';
-}
-
-static void building_color(char t,float *r,float *g,float *b,float *h)
-{
-    *h=2.8f;
-    *r=0.72f; *g=0.55f; *b=0.38f;
-    switch(t) {
-        case 'C': *h=1.0f; *r=.95f; *g=.78f; *b=.20f; break;
-        case 'G': *h=1.5f; *r=.95f; *g=.58f; *b=.22f; break;
-        case 'B': *h=1.8f; *r=.65f; *g=.25f; *b=.20f; break;
-        case 'A': *h=2.5f; *r=.28f; *g=.48f; *b=.85f; break;
-        case 'L': *h=2.7f; *r=.60f; *g=.42f; *b=.30f; break;
-        case 'F': *h=3.2f; *r=.60f; *g=.63f; *b=.67f; break;
-        case 'N': *h=3.8f; *r=.58f; *g=.36f; *b=.76f; break;
-        case 'D': *h=4.5f; *r=.88f; *g=.89f; *b=.92f; break;
-        case 'E': *h=6.0f; *r=.30f; *g=.68f; *b=.80f; break;
-        case 'H': *h=1.6f; *r=.80f; *g=.22f; *b=.18f; break;
-        case 'J': *h=1.8f; *r=.22f; *g=.42f; *b=.82f; break;
-        case 'K': *h=2.2f; *r=.78f; *g=.78f; *b=.72f; break;
-        case 'O': *h=4.8f; *r=.50f; *g=.62f; *b=.75f; break;
-        case 'I': *h=3.5f; *r=.25f; *g=.55f; *b=.70f; break;
-        case 'U': *h=3.0f; *r=.78f; *g=.65f; *b=.42f; break;
-        case 'X': *h=1.8f; *r=.25f; *g=.55f; *b=.35f; break;
-        case 'Q': *h=1.4f; *r=.62f; *g=.32f; *b=.20f; break;
-        case 'Z': *h=3.4f; *r=.85f; *g=.35f; *b=.55f; break;
-        case 's': *h=2.4f; *r=.78f; *g=.72f; *b=.62f; break;
-        case 'R': *h=2.6f; *r=.72f; *g=.20f; *b=.18f; break;
-        case 'M': *h=1.6f; *r=.20f; *g=.68f; *b=.42f; break;
-        case 'Y': *h=3.6f; *r=.90f; *g=.90f; *b=.82f; break;
-        case 'V': *h=4.2f; *r=.88f; *g=.68f; *b=.22f; break;
-        case 'c': case 'q': *h=2.2f; *r=.25f; *g=.35f; *b=.52f; break;
-    }
-}
-
-static int solid_tile(char t)
-{
-    return t == 'T' || t == 'W' ||
-           (strchr("CGBA LFNDEHJKXO IQZsRcqYMVU", t) != NULL && t != ' ');
-}
-
-static int player_can_stand(float x, float y)
-{
-    const float offsets[5][2] = {
-        {0.0f, 0.0f}, {-PLAYER_RADIUS, 0.0f}, {PLAYER_RADIUS, 0.0f},
-        {0.0f, -PLAYER_RADIUS}, {0.0f, PLAYER_RADIUS}
-    };
-    for (int i = 0; i < 5; ++i) {
-        int tx = (int)floorf(x + offsets[i][0] + 0.5f);
-        int ty = (int)floorf(y + offsets[i][1] + 0.5f);
-        if (tx < 0 || ty < 0 || tx >= map_width || ty >= map_height) return 0;
-        if (solid_tile(map_at(tx, ty))) return 0;
-    }
-    return 1;
-}
-
-static float angle_lerp(float current, float target, float amount)
-{
-    float d = atan2f(sinf(target-current), cosf(target-current));
-    return current + d * amount;
-}
-
-static void update_player(float dx, float dy, int run)
-{
-    float input_len = sqrtf(dx*dx + dy*dy);
-    if (input_len > 1.0f) { dx /= input_len; dy /= input_len; input_len = 1.0f; }
-
-    float speed = run ? PLAYER_RUN_SPEED : PLAYER_SPEED;
-    float target_x = dx * speed;
-    float target_y = dy * speed;
-    /* Aceleración y frenado progresivos, como en el juego original. */
-    player_vx += (target_x - player_vx) * (input_len > 0.01f ? 0.22f : 0.16f);
-    player_vy += (target_y - player_vy) * (input_len > 0.01f ? 0.22f : 0.16f);
-
-    if (player_can_stand(player_fx + player_vx, player_fy)) player_fx += player_vx;
-    else player_vx = 0.0f;
-    if (player_can_stand(player_fx, player_fy + player_vy)) player_fy += player_vy;
-    else player_vy = 0.0f;
-
-    float actual = sqrtf(player_vx*player_vx + player_vy*player_vy);
-    player_anim_speed = actual / PLAYER_SPEED;
-    if (player_anim_speed > 1.7f) player_anim_speed = 1.7f;
-
-    if (actual > 0.0015f) {
-        float target_angle = atan2f(player_vx, player_vy);
-        player_angle = angle_lerp(player_angle, target_angle, 0.20f);
-        walk_phase += 0.30f * (actual / PLAYER_SPEED);
-    } else {
-        player_anim_speed = 0.0f;
-        walk_phase *= 0.82f;
-        if (fabsf(player_vx) < 0.0005f) player_vx = 0.0f;
-        if (fabsf(player_vy) < 0.0005f) player_vy = 0.0f;
-    }
-    player_x = (int)floorf(player_fx + 0.5f);
-    player_y = (int)floorf(player_fy + 0.5f);
-}
-
-
-
-static void character_vertex(float x, float y, float z, float r, float g, float b)
-{
-    vertex(x, y, z, r, g, b);
-}
-
-/* Geometría del personaje original: piezas voxel con pivotes en cadera,
-   hombros y cuello. La transformación rota la pieza alrededor del pivote,
-   no alrededor del centro de cada cubo. */
-static void character_box(float ox, float oy, float oz,
-                          float px, float py, float pz,
-                          float sx, float sy, float sz,
-                          float rot_x, float rot_y, float rot_z,
-                          float r, float g, float b)
-{
-    float cx=cosf(rot_x), sxr=sinf(rot_x);
-    float cy=cosf(rot_y), syr=sinf(rot_y);
-    float cz=cosf(rot_z), szr=sinf(rot_z);
-    for (int f=0; f<6; ++f) {
-        for (int k=0; k<6; ++k) {
-            int vi=(int[]){0,1,2,0,2,3}[k];
-            float x=px+(cube_faces[f][vi][0]-.5f)*sx;
-            float y=py+(cube_faces[f][vi][1]-.5f)*sy;
-            float z=pz+(cube_faces[f][vi][2]-.5f)*sz;
-            float y1=y*cx-z*sxr, z1=y*sxr+z*cx;
-            float x2=x*cz-y1*szr, y2=x*szr+y1*cz;
-            float wx=x2*cy+z1*syr;
-            float wz=-x2*syr+z1*cy;
-            float shade=shade_face[f];
-            character_vertex(ox+wx,oy+y2,oz+wz,r*shade,g*shade,b*shade);
-        }
-    }
-}
-
-static void draw_original_character(void)
-{
-    const float s=CELL_SCALE;
-    const float bx=(player_fx-mesh_origin_x)*s;
-    const float bz=(player_fy-mesh_origin_y)*s;
-
-    /* Paleta exacta de personaje_crear() en src/player/personaje.c */
-    const float shirt[3]={0xd9/255.0f,0x38/255.0f,0x2c/255.0f};
-    const float pants[3]={0x2f/255.0f,0x62/255.0f,0xc9/255.0f};
-    const float skin[3] ={0xf2/255.0f,0xc2/255.0f,0x30/255.0f};
-    const float hair[3] ={0x5a/255.0f,0x3a/255.0f,0x22/255.0f};
-    const float belt[3] ={0x3a/255.0f,0x2c/255.0f,0x22/255.0f};
-    const float shoe[3] ={0x24/255.0f,0x24/255.0f,0x2b/255.0f};
-    const float eye[3]  ={0x1b/255.0f,0x1b/255.0f,0x22/255.0f};
-    const float mouth[3]={0xb8/255.0f,0x48/255.0f,0x4a/255.0f};
-
-    float vel=player_anim_speed;
-    float correr=vel>1.0f?(vel-1.0f)/0.7f:0.0f;
-    if(correr>1.0f)correr=1.0f;
-    if(vel>1.0f)vel=1.0f;
-    float step=sinf(walk_phase);
-    float quieto=(1.0f-vel);
-    float balanceo=step*(48.0f+24.0f*correr)*vel*(3.14159265f/180.0f);
-    float rebote=fabsf(step)*(0.07f+0.06f*correr)*vel*s;
-    float respira=sinf(anim_time*2.2f)*0.012f*quieto*s;
-    float inclina=((5.0f+11.0f*correr)*vel)*(3.14159265f/180.0f);
-    float giro_torso=step*7.0f*vel*(3.14159265f/180.0f);
-    float mira=sinf(anim_time*0.6f)*14.0f*quieto*(3.14159265f/180.0f);
-    float abre=(4.0f+sinf(anim_time*2.2f)*1.5f*quieto)*(3.14159265f/180.0f);
-    float root_y=rebote+respira;
-
-    /* Piernas: cada una gira desde la cadera, igual que la malla Vita. */
-    character_box(bx,root_y+.60f*s,bz,-.17f*s,-.30f*s,0,
-        .30f*s,.50f*s,.30f*s,balanceo,player_angle,0,
-        pants[0],pants[1],pants[2]);
-    character_box(bx,root_y+.60f*s,bz,.17f*s,-.30f*s,0,
-        .30f*s,.50f*s,.30f*s,-balanceo,player_angle,0,
-        pants[0],pants[1],pants[2]);
-    character_box(bx,root_y+.60f*s,bz,-.17f*s,-.55f*s,.015f*s,
-        .30f*s,.10f*s,.34f*s,balanceo,player_angle,0,
-        shoe[0],shoe[1],shoe[2]);
-    character_box(bx,root_y+.60f*s,bz,.17f*s,-.55f*s,.015f*s,
-        .30f*s,.10f*s,.34f*s,-balanceo,player_angle,0,
-        shoe[0],shoe[1],shoe[2]);
-
-    /* Torso, cabeza y brazos comparten el movimiento del tronco. */
-    float tx=bx, ty=root_y+.60f*s, tz=bz;
-    character_box(tx,ty,tz,0,-.30f*s,0,.80f*s,.60f*s,.40f*s,
-        inclina,player_angle,giro_torso,shirt[0],shirt[1],shirt[2]);
-    character_box(tx,ty,tz,0,-.55f*s,0,.80f*s,.10f*s,.40f*s,
-        inclina,player_angle,giro_torso,belt[0],belt[1],belt[2]);
-    character_box(tx,ty,tz,0,-.015f*s,.12f*s,.20f*s,.10f*s,.16f*s,
-        inclina,player_angle,giro_torso,skin[0],skin[1],skin[2]);
-
-    /* Brazos articulados: manga arriba y mano amarilla abajo. */
-    character_box(tx,ty,tz,-.50f*s,-.20f*s,0,.20f*s,.40f*s,.20f*s,
-        inclina-balanceo*.9f,player_angle,giro_torso+abre,
-        shirt[0],shirt[1],shirt[2]);
-    character_box(tx,ty,tz,-.50f*s,-.50f*s,0,.20f*s,.20f*s,.20f*s,
-        inclina-balanceo*.9f,player_angle,giro_torso+abre,
-        skin[0],skin[1],skin[2]);
-    character_box(tx,ty,tz,.50f*s,-.20f*s,0,.20f*s,.40f*s,.20f*s,
-        inclina+balanceo*.9f,player_angle,giro_torso-abre,
-        shirt[0],shirt[1],shirt[2]);
-    character_box(tx,ty,tz,.50f*s,-.50f*s,0,.20f*s,.20f*s,.20f*s,
-        inclina+balanceo*.9f,player_angle,giro_torso-abre,
-        skin[0],skin[1],skin[2]);
-
-    /* Cabeza de 6x6x6 voxels, flequillo, nuca y patillas originales. */
-    character_box(tx,ty,tz,0,.30f*s,0,.60f*s,.60f*s,.60f*s,
-        inclina,player_angle,mira,skin[0],skin[1],skin[2]);
-    character_box(tx,ty,tz,0,.55f*s,0,.60f*s,.10f*s,.60f*s,
-        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
-    character_box(tx,ty,tz,0,.45f*s,-.20f*s,.60f*s,.10f*s,.20f*s,
-        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
-    character_box(tx,ty,tz,-.25f*s,.45f*s,-.05f*s,.10f*s,.10f*s,.50f*s,
-        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
-    character_box(tx,ty,tz,.25f*s,.45f*s,-.05f*s,.10f*s,.10f*s,.50f*s,
-        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
-    character_box(tx,ty,tz,0,.35f*s,-.25f*s,.60f*s,.10f*s,.10f*s,
-        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
-    character_box(tx,ty,tz,0,.45f*s,.25f*s,.60f*s,.10f*s,.10f*s,
-        inclina,player_angle,mira,hair[0],hair[1],hair[2]);
-
-    /* Ojos y boca en la cara frontal (+Z). */
-    character_box(tx,ty,tz,-.20f*s,.35f*s,.302f*s,.10f*s,.10f*s,.025f*s,
-        inclina,player_angle,mira,eye[0],eye[1],eye[2]);
-    character_box(tx,ty,tz,.20f*s,.35f*s,.302f*s,.10f*s,.10f*s,.025f*s,
-        inclina,player_angle,mira,eye[0],eye[1],eye[2]);
-    character_box(tx,ty,tz,0,.15f*s,.302f*s,.20f*s,.10f*s,.025f*s,
-        inclina,player_angle,mira,mouth[0],mouth[1],mouth[2]);
-}
-
-
-static void draw_city(void)
-{
-    /* Toda la ciudad se construye de una vez. Los suelos y edificios
-       contiguos del mismo tipo se fusionan en rectángulos para reducir
-       drásticamente vértices y llamadas de dibujo. */
-    static unsigned char used[MAP_MAX][MAP_MAX];
-    memset(used, 0, sizeof(used));
-    if (!building_world_mesh) C3D_ImmDrawBegin(GPU_TRIANGLES);
-
-    for (int my = 0; my < map_height; ++my) {
-        for (int mx = 0; mx < map_width; ++mx) {
-            char t = map_at(mx, my);
-            if (used[my][mx]) continue;
-
-            float wx = (mx - mesh_origin_x) * CELL_SCALE;
-            float wz = (my - mesh_origin_y) * CELL_SCALE;
-            float half = CELL_SCALE * .5f;
-
-            if (t == 'T') {
-                used[my][mx] = 1;
-                box(wx-half*.24f, 0, wz-half*.24f,
-                    wx+half*.24f, CELL_SCALE, wz+half*.24f,
-                    .38f,.22f,.10f,-1,-1,'#');
-                box(wx-half, CELL_SCALE*.85f, wz-half,
-                    wx+half, CELL_SCALE*2.7f, wz+half,
-                    .12f,.48f,.16f,-1,-1,'#');
-                continue;
-            }
-
-            int w = 1, h = 1;
-            while (mx+w < map_width && !used[my][mx+w] &&
-                   map_at(mx+w,my) == t && t != 'P') w++;
-            for (;;) {
-                if (my+h >= map_height || t == 'P') break;
-                int same = 1;
-                for (int k=0;k<w;k++)
-                    if (used[my+h][mx+k] || map_at(mx+k,my+h) != t) { same=0; break; }
-                if (!same) break;
-                h++;
-            }
-            for (int yy=0; yy<h; ++yy)
-                for (int xx=0; xx<w; ++xx) used[my+yy][mx+xx] = 1;
-
-            float xlo = wx-half;
-            float zlo = wz-half;
-            float xhi = wx + (w-.5f)*CELL_SCALE;
-            float zhi = wz + (h-.5f)*CELL_SCALE;
-
-            float gr=.39f, gg=.70f, gb=.29f;
-            if (t=='=') { gr=.29f; gg=.30f; gb=.34f; }
-            else if (t=='S') { gr=.70f; gg=.69f; gb=.65f; }
-            else if (t=='W') { gr=.14f; gg=.42f; gb=.78f; }
-
-            if (!is_building(t))
-                map_quad(xlo,-.02f,zlo,xhi,zhi,gr,gg,gb);
-
-            if (is_building(t)) {
-                float r,g,b,bh;
-                building_color(t,&r,&g,&b,&bh);
-                /* Un solo prisma por bloque contiguo, sin caras internas. */
-                box(xlo,0,zlo,xhi,bh*CELL_SCALE,zhi,r,g,b,-1,-1,'#');
-            }
-        }
-    }
-    if (!building_world_mesh) C3D_ImmDrawEnd();
-}
-
-/* Convierte el escenario estatico en dos buffers GPU reutilizables.
-   Posiciones y colores se separan para usar el formato de atributos PICA. */
-static int rebuild_world_mesh(void)
-{
-    mesh_origin_x = player_x;
-    mesh_origin_y = player_y;
-    world_vertex_count = 0;
-    if (world_positions) { linearFree(world_positions); world_positions = NULL; }
-    if (world_colors) { linearFree(world_colors); world_colors = NULL; }
-    build_count = 0;
-    building_world_mesh = 1;
-    draw_city();
-    building_world_mesh = 0;
-
-    if (build_count == 0 || build_count > 700000) {
-        free(build_vertices);
-        build_vertices = NULL;
-        build_capacity = 0;
-        return 0;
-    }
-    world_positions = linearAlloc(build_count * 3 * sizeof(float));
-    world_colors = linearAlloc(build_count * 4 * sizeof(float));
-    if (!world_positions || !world_colors) {
-        if (world_positions) linearFree(world_positions);
-        if (world_colors) linearFree(world_colors);
-        world_positions = world_colors = NULL;
-        return 0;
-    }
-    float *p = (float *)world_positions;
-    float *col = (float *)world_colors;
-    for (size_t i = 0; i < build_count; ++i) {
-        const WorldVertex *v = &build_vertices[i];
-        *p++=v->x; *p++=v->y; *p++=v->z;
-        *col++=v->r; *col++=v->g; *col++=v->b; *col++=v->a;
-    }
-    world_vertex_count = (int)build_count;
-    free(build_vertices);
-    build_vertices = NULL;
-    build_capacity = 0;
-    return 1;
-}
-
-static void draw_world_mesh(void)
-{
-    C3D_BufInfo *buf = C3D_GetBufInfo();
-    BufInfo_Init(buf);
-    BufInfo_Add(buf, world_positions, 3 * sizeof(float), 1, 0x0);
-    BufInfo_Add(buf, world_colors, 4 * sizeof(float), 1, 0x1);
-    C3D_DrawArrays(GPU_TRIANGLES, 0, world_vertex_count);
-
-    C3D_ImmDrawBegin(GPU_TRIANGLES);
-    draw_original_character();
-    C3D_ImmDrawEnd();
-}
-
-/* El backend de compatibilidad transforma los vértices en CPU.
-   Estas matrices identidad evitan aplicar dos veces la cámara en el shader. */
-void brick3ds_set_identity_uniforms(void)
-{
-    C3D_Mtx identity;
-    Mtx_Identity(&identity);
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_projection,&identity);
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_modelView,&identity);
-}
-
-static int scene_init(void)
-{
-    vshader_dvlb=DVLB_ParseFile((u32*)vshader_shbin,vshader_shbin_size);
-    if(!vshader_dvlb)return 0;
-    shaderProgramInit(&program);
-    shaderProgramSetVsh(&program,&vshader_dvlb->DVLE[0]);
-    C3D_BindProgram(&program);
-    u_projection=shaderInstanceGetUniformLocation(program.vertexShader,"projection");
-    u_modelView=shaderInstanceGetUniformLocation(program.vertexShader,"modelView");
-    C3D_AttrInfo *attrs=C3D_GetAttrInfo();
-    AttrInfo_Init(attrs);
-    AttrInfo_AddLoader(attrs,0,GPU_FLOAT,3);
-    AttrInfo_AddLoader(attrs,1,GPU_FLOAT,4);
-    Mtx_PerspTilt(&projection,C3D_AngleFromDegrees(55.0f),C3D_AspectRatioTop,.1f,100.0f,false);
-    C3D_TexEnv *env=C3D_GetTexEnv(0);
-    C3D_TexEnvInit(env);
-    C3D_TexEnvSrc(env,C3D_Both,GPU_PRIMARY_COLOR,0,0);
-    C3D_TexEnvFunc(env,C3D_Both,GPU_REPLACE);
-    C3D_DepthMap(true,-1.0f,0.0f);
-    C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);
-    C3D_CullFace(GPU_CULL_NONE);
-    return 1;
-}
-
-int main(int argc,char **argv)
-{
-    (void)argc;(void)argv;
-    gfxInitDefault();
-    consoleInit(GFX_BOTTOM,NULL);
-    if(R_FAILED(romfsInit())) {
-        printf("No se pudo montar ROMFS.\n");
-        gfxExit(); return 1;
-    }
-    if(!load_city_map()) {
-        printf("No se pudo leer mapas/ciudad.txt\n");
-        romfsExit();gfxExit();return 1;
-    }
-    if(!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE)) {
-        printf("No se pudo iniciar Citro3D.\n");
-        romfsExit();gfxExit();return 1;
-    }
-    target=C3D_RenderTargetCreate(240,400,GPU_RB_RGBA8,GPU_RB_DEPTH24_STENCIL8);
-    if(!target) {
-        C3D_Fini();romfsExit();gfxExit();return 1;
-    }
-    C3D_RenderTargetSetOutput(target,GFX_TOP,GFX_LEFT,DISPLAY_TRANSFER_FLAGS);
-    if(!scene_init()) {
-        printf("Error cargando shader.\n");
-        C3D_RenderTargetDelete(target);C3D_Fini();romfsExit();gfxExit();return 1;
-    }
-
-    printf("A BRICK CUBE - CIUDAD 3DS\n");
-    printf("Mapa original: %d x %d\n",map_width,map_height);
-    printf("Inicio original: %d, %d\n",player_x,player_y);
-    printf("Ciudad completa: %d x %d tiles\n", map_width, map_height);
-    printf("Render por sectores: %d x %d tiles\n", CHUNK_SIZE, CHUNK_SIZE);
-    player_fx = (float)player_x;
-    player_fy = (float)player_y;
-    if (!rebuild_world_mesh())
-        printf("Aviso: no se pudo crear la malla estatica; se usara render de emergencia.\\n");
-    printf("Stick: mover jugador\n");
-    printf("Cruceta izq./der.: girar camara\n");
-    printf("Cruceta arriba/abajo: inclinar\n");
-    printf("Colisiones: edificios, arboles y agua\n");
-    printf("START: salir\n");
-
-    while(aptMainLoop()) {
-        hidScanInput();
-        u32 down=hidKeysDown();
+    while (aptMainLoop()) {
+        hidScanInput(); u32 down=hidKeysDown(), held=hidKeysHeld();
         if(down&KEY_START)break;
-        circlePosition circle;
-        hidCircleRead(&circle);
-        u32 held = hidKeysHeld();
-        /* Movimiento relativo a la cámara: arriba siempre avanza hacia delante. */
-        float stick_x = (float)circle.dx / 156.0f;
-        float stick_y = -(float)circle.dy / 156.0f;
-        if (held & KEY_RIGHT) stick_x += 1.0f;
-        if (held & KEY_LEFT)  stick_x -= 1.0f;
-        if (held & KEY_UP)    stick_y += 1.0f;
-        if (held & KEY_DOWN)  stick_y -= 1.0f;
-        float move_x = sinf(angle_y)*stick_y + cosf(angle_y)*stick_x;
-        float move_y = cosf(angle_y)*stick_y - sinf(angle_y)*stick_x;
-        update_player(move_x, move_y, (held & KEY_B) != 0);
-        /* La malla se conserva entre varios tiles. Solo se reconstruye al
-           alejarse 8 tiles del centro, evitando pausas de CPU cada paso. */
-        float mdx = player_fx - (float)mesh_origin_x;
-        float mdy = player_fy - (float)mesh_origin_y;
-        if (mdx*mdx + mdy*mdy >= MESH_RECENTER_DISTANCE*MESH_RECENTER_DISTANCE) {
-            if (!rebuild_world_mesh())
-                printf("Aviso: no se pudo actualizar la malla del sector.\\n");
+        circlePosition cp;hidCircleRead(&cp);
+        SceCtrlData pad;pad.buttons=0;
+        if(held&KEY_A)pad.buttons|=SCE_CTRL_CROSS;
+        if(held&KEY_B)pad.buttons|=SCE_CTRL_CIRCLE;
+        if(held&KEY_X)pad.buttons|=SCE_CTRL_TRIANGLE;
+        if(held&KEY_Y)pad.buttons|=SCE_CTRL_SQUARE;
+        if(held&KEY_R)pad.buttons|=SCE_CTRL_RTRIGGER;
+        if(held&KEY_L)pad.buttons|=SCE_CTRL_LTRIGGER;
+        pad.lx=(unsigned char)(128+(int)cp.dx*127/156);
+        pad.ly=(unsigned char)(128-(int)cp.dy*127/156);
+        float rx=((held&KEY_RIGHT)?1.0f:0.0f)-((held&KEY_LEFT)?1.0f:0.0f);
+        float ry=((held&KEY_UP)?1.0f:0.0f)-((held&KEY_DOWN)?1.0f:0.0f);
+        brick3ds_frame_begin();
+
+        // --- Actualizar ---
+        unsigned nuevos = pad.buttons & ~prev;
+        prev = pad.buttons;
+        float lx = leer_stick(pad.lx), ly = leer_stick(pad.ly);
+        /* Cruceta: control de cámara en Old 3DS, sin stick derecho. */
+        // --- Transición (fundido a negro) ---
+        if (fase_f == 1) {
+            if (++fund >= 14) {
+                fund = 14; fase_f = -1;
+                if (pend_salir) {
+                    interior_salir(); dentro = 0; pend_salir = 0; hablando_i = -1;
+                    jugador.x = gx; jugador.z = gz; jugador.suelo = jugador.elev = gsuelo; jugador.vel = 0; camara = cam_guardada;
+                } else if (pend_puerta) {
+                    interior_cambiar(&jugador); pend_puerta = 0; hablando_i = -1;
+                } else {
+                    gx = jugador.x; gz = jugador.z; gsuelo = jugador.suelo; cam_guardada = camara;
+                    interior_entrar(pend_l, &jugador); dentro = pend_l; hablando = -1;
+                }
+            }
+        } else if (fase_f == -1) { if (--fund <= 0) { fund = 0; fase_f = 0; } }
+        if (fase_f) { lx = ly = 0.0f; nuevos &= ~(SCE_CTRL_CROSS | SCE_CTRL_CIRCLE | SCE_CTRL_TRIANGLE); }
+
+        // --- Dentro de un lugar: cámara fija desde arriba, como Pokémon ---
+        if (dentro) {
+            if (hablando_i >= 0) {
+                interior_actualizar(&jugador, 0, 0, 0);
+                if (dialogo_actualizar((nuevos & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) != 0)) hablando_i = -1;
+            } else {
+                { int rv = interior_actualizar(&jugador, lx, ly, (pad.buttons & SCE_CTRL_RTRIGGER) != 0);
+                  if (rv == 1 && fase_f == 0) { pend_salir = 1; fase_f = 1; }
+                  else if (rv == 2 && fase_f == 0) { pend_puerta = 1; fase_f = 1; } }
+                if (nuevos & SCE_CTRL_CIRCLE) {
+                    int q = interior_npc_cercano(&jugador, 1.7f);
+                    if (q >= 0) { hablando_i = q; interior_hablar(q, &jugador); }
+                }
+            }
+            camara.hombro = 0; camara.desvio = 0; camara.sin_choque = 1; camara.giro = 0.0f; camara.alto = 52.0f;
+            camara.distancia = camara.real = camara.dist_meta = 11.0f; camara.py = 0.25f;
+            glViewport(0, 0, 960, 544);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glFrustum(-0.576f, 0.576f, -0.3264f, 0.3264f, 0.6f, 330.0f);
+            camara_aplicar(&camara, jugador.x, jugador.z);
+            cubo_activar();
+            glEnable(GL_DEPTH_TEST);
+            interior_dibujar(jugador.tiempo);
+            jugador_dibujar(&jugador);
+            cubo_desactivar();
+            ui_inicio();
+            { const char *tt = interior_titulo(); int w = (int)ui_ancho(tt, 1);
+              ui_rect(14, 14, w + 28, 30, 0x000000B4); ui_texto(28, 20, 1, tt, 0xFFFFFFFF); }
+            if (hablando_i >= 0) dialogo_dibujar();
+            else {
+                int q = interior_npc_cercano(&jugador, 1.7f);
+                if (q >= 0) {
+                    char t[80]; snprintf(t, sizeof(t), "○ Hablar con %s", interior_npc_nombre(q));
+                    int w = (int)ui_ancho(t, 1);
+                    ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
+                    ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
+                }
+            }
+            if (fund > 0) ui_rect(0, 0, 960, 544, (unsigned)(fund * 255 / 14));
+            ui_fin();
+            brick3ds_present();
+            continue;
         }
-        anim_time += 1.0f / 60.0f;
 
-        /* La cámara permanece detrás de la espalda y gira suavemente con él. */
-        angle_y = angle_lerp(angle_y, player_angle, 0.14f);
+        // En el carro la cámara va fija detrás (como GTA): el stick derecho no la mueve
+        camara_actualizar(&camara, en_carro >= 0 ? 0.0f : rx, en_carro >= 0 ? 0.0f : ry, en_carro >= 0 ? 0 : (nuevos & SCE_CTRL_LTRIGGER) != 0);
+        npcs_actualizar(jugador.x, jugador.z);
+        escombros_actualizar();
+        reloj_actualizar();
+        mision_actualizar(en_carro >= 0 ? jugador.x : jugador.x, jugador.z, en_carro >= 0);
+        vehiculos_ia(jugador.x, jugador.z, en_carro);
+        vehiculos_pasivos(en_carro >= 0 ? en_carro : (anim > 0 ? anim_n : -1));
+        if (en_carro < 0) camara.sin_choque = 0;
+        float fx = jugador.x, fz = jugador.z;   // lo que sigue la cámara
 
-        C3D_Mtx model;
-        Mtx_Identity(&model);
-        Mtx_Translate(&model,-(player_fx-mesh_origin_x)*CELL_SCALE,-.10f,-.58f-(player_fy-mesh_origin_y)*CELL_SCALE,true);
-        Mtx_RotateX(&model,angle_x,true);
-        Mtx_RotateY(&model,angle_y,true);
-        C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_projection,&projection);
-        C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,u_modelView,&model);
-
-        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-        C3D_RenderTargetClear(target,C3D_CLEAR_ALL,CLEAR_COLOR,0);
-        C3D_FrameDrawOn(target);
-        if (world_positions && world_vertex_count > 0)
-            draw_world_mesh();
-        else {
-            draw_city();
+        if (anim > 0) {
+            // Subiendo o bajando: salta hacia la puerta (o hacia afuera) sin controles
+            anim--;
+            int total = anim_sube ? 24 : 20;
+            float k = 1.0f - (float)anim / total;
+            jugador.x = ax0 + (ax1 - ax0) * k; jugador.z = az0 + (az1 - az0) * k;
+            jugador.elev = sinf(3.14159265f * k) * 0.55f;
+            jugador.angulo = atan2f(ax1 - ax0, az1 - az0) * 57.29578f;
+            jugador.vel = 0.6f; jugador.fase += 0.3f; jugador.tiempo += 1.0f / 60.0f;
+            if (anim_n >= 0) vehiculo_manejar(anim_n, 0.0f, 0.0f, 0.0f, 1);   // freno de mano (antes se iba en reversa)
+            fx = jugador.x; fz = jugador.z;
+            if (anim == 0) {
+                jugador.elev = 0.0f; jugador.vel = 0.0f;
+                if (anim_sube) { en_carro = anim_n; camara.alto = 12.0f; }
+            }
+        } else if (en_carro < 0) {
+            if (hablando >= 0) {
+                jugador_actualizar(&jugador, 0, 0, camara.giro, 0, 0);
+                if (dialogo_actualizar((nuevos & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) != 0)) {
+                    if (npc_da_mision(hablando) && !mision_activa() && mision_preparar(jugador.x, jugador.z)) oferta = 1;
+                    npc_soltar(hablando); hablando = -1;
+                }
+            } else if (oferta) {
+                jugador_actualizar(&jugador, 0, 0, camara.giro, 0, 0);
+                if (nuevos & SCE_CTRL_CIRCLE) { mision_aceptar(); oferta = 0; }
+                else if (nuevos & SCE_CTRL_CROSS) oferta = 0;
+            } else {
+                jugador_actualizar(&jugador, lx, ly, camara.giro, (pad.buttons & SCE_CTRL_RTRIGGER) != 0,
+                                   (nuevos & SCE_CTRL_CROSS) != 0);
+                if (nuevos & SCE_CTRL_CIRCLE) {
+                    int q = npc_cercano(jugador.x, jugador.z, 2.4f);
+                    if (q >= 0) { hablando = q; npc_hablar(q, jugador.x, jugador.z); }
+                }
+            }
+            if (hablando < 0 && (nuevos & SCE_CTRL_TRIANGLE)) {
+                int n = vehiculo_cercano(jugador.x, jugador.z, 3.5f);
+                if (n >= 0) {
+                    float a0, v0;
+                    ax0 = jugador.x; az0 = jugador.z;
+                    vehiculo_pos(n, &ax1, &az1, &a0, &v0);
+                    anim = 24; anim_n = n; anim_sube = 1; vehiculo_tomar(n);
+                } else {
+                    char L = lugar_entrada_cerca(jugador.x, jugador.z, 2.5f);
+                    if (L && interior_hay(L) && fase_f == 0) { pend_l = L; pend_salir = 0; fase_f = 1; }
+                }
+            }
+            fx = jugador.x; fz = jugador.z;
+            camara.dist_meta = 6.5f;
+        } else {
+            float ang, vel, vx, vz;
+            // R = acelerar, L = freno / reversa, stick (arriba/abajo) hace lo mismo, cuadrado = freno de mano
+            float gas = (pad.buttons & SCE_CTRL_RTRIGGER) ? 1.0f : (ly < 0.0f ? -ly : 0.0f);
+            float frn = (pad.buttons & SCE_CTRL_LTRIGGER) ? 1.0f : (ly > 0.0f ? ly : 0.0f);
+            vehiculo_manejar(en_carro, lx, gas, frn, (pad.buttons & SCE_CTRL_SQUARE) != 0);
+            vehiculo_pos(en_carro, &fx, &fz, &ang, &vel);
+            vehiculo_velocidad(en_carro, &vx, &vz);
+            // Cámara de persecución: va detrás del carro con un poco de retraso; el stick derecho mira alrededor
+            camara.hombro = 0;
+            camara.sin_choque = 1;
+            camara.dist_meta = 8.0f;
+            camara.giro = 180.0f - ang;                            // justo detrás del carro (la cámara se coloca opuesta a giro)
+            camara.alto = 10.0f;
+            jugador.x = fx; jugador.z = fz; jugador.vel = 0.0f;
+            if (nuevos & SCE_CTRL_TRIANGLE) {
+                // se baja por el lado derecho (o el primer lado libre)
+                float r = ang * 3.14159265f / 180.0f;
+                int ok = 0;
+                static const float RADIOS[4] = { 1.9f, 2.6f, 3.4f, 4.6f };
+                for (int rr = 0; rr < 4 && !ok; rr++)                 // prueba derecha, izquierda, atrás, adelante y las diagonales, cada vez más lejos
+                    for (int k = 0; k < 8 && !ok; k++) {
+                        static const float GIROS[8] = { 1.5708f, -1.5708f, 3.1416f, 0.0f, 0.7854f, -0.7854f, 2.3562f, -2.3562f };
+                        float a2 = r + GIROS[k];
+                        float ex = fx + sinf(a2) * RADIOS[rr], ez = fz + cosf(a2) * RADIOS[rr];
+                        if (!ciudad_choca(ex, ez, 0.45f) && !vehiculos_choca(ex, ez, 0.45f, -1)) { jugador.x = ex; jugador.z = ez; ok = 1; }
+                    }
+                if (!ok) { jugador.x = fx + sinf(r + 1.5708f) * 1.9f; jugador.z = fz + cosf(r + 1.5708f) * 1.9f; ok = 1; }   // último recurso: siempre se puede bajar
+                if (ok) {
+                    ax0 = fx; az0 = fz; ax1 = jugador.x; az1 = jugador.z;
+                    jugador.x = ax0; jugador.z = az0;
+                    anim = 20; anim_n = en_carro; anim_sube = 0; en_carro = -1;
+                }
+            }
         }
-        C3D_FrameEnd(0);
+
+        // --- Dibujar ---
+        glViewport(0, 0, 960, 544);
+        { float sr, sg, sb; reloj_cielo(&sr, &sg, &sb); glClearColor(sr, sg, sb, 1.0f); }
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glFrustum(-0.576f, 0.576f, -0.3264f, 0.3264f, 0.6f, 330.0f);
+
+        camara.py += ((en_carro < 0 ? jugador.suelo : 0.0f) - camara.py) * 0.15f;
+        camara_aplicar(&camara, fx, fz);
+
+        cubo_activar();
+        // 1) Todo lo plano (mar, arena, pasto, calles) se pinta en orden y sin profundidad:
+        //    así nunca se mezclan ni se ven rayitas entre ellos.
+        glEnable(GL_DEPTH_TEST);
+        frontera_dibujar_suelo(fx, fz);
+        suelo_dibujar(fx, fz);
+        ciudad_dibujar_suelo(fx, fz);
+        terreno_dibujar(fx, fz, camara.giro);   // detalle de cerca: rayas, bordillos, cebras
+        // 2) Lo que tiene volumen, con profundidad.
+        glEnable(GL_DEPTH_TEST);
+        ciudad_dibujar(fx, fz, camara.giro);   // edificios, árboles y lugares con modelo
+        frontera_dibujar(fx, fz);
+        vehiculos_dibujar(fx, fz);
+        npcs_dibujar(fx, fz);
+        escombros_dibujar(fx, fz);
+        mision_dibujar_3d(fx, fz);
+        if (en_carro < 0) jugador_dibujar(&jugador);
+        else { float cx2, cz2, a2, v2; vehiculo_pos(en_carro, &cx2, &cz2, &a2, &v2); float rl, pt, al; vehiculo_inclinacion(en_carro, &rl, &pt, &al); jugador_dibujar_en_carro(&jugador, cx2, cz2, a2, rl, pt, al); }
+        cubo_desactivar();
+
+        // 3) Interfaz 2D
+        ui_inicio();
+        reloj_filtro();                                       // noche / atardecer
+        { float mx2 = fx, mz2 = fz; (void)mx2; (void)mz2;
+          { float mkx = 0, mkz = 0; int hm = mision_marca(&mkx, &mkz); minimapa_dibujar(fx, fz, en_carro >= 0 ? 0.0f : jugador.angulo, hm, mkx, mkz); }
+          char hh[16]; int h = (int)reloj_hora(), mi = (int)((reloj_hora() - h) * 60.0f); snprintf(hh, sizeof(hh), "%02d:%02d", h, mi);
+          ui_rect(14, 14, 88, 30, 0x000000B4); ui_texto(22, 20, 1, hh, 0xFFFFFFFF); }
+        mision_dibujar_hud();
+        if (oferta) {
+            char ln[4][96]; int nl = ui_partir(mision_oferta(), 1, 640, ln, 4);
+            ui_rect(150, 380, 660, 30 + nl * 22 + 34, 0x000000D0);
+            for (int i = 0; i < nl; i++) ui_texto(170, 394 + i * 22, 1, ln[i], 0xFFFFFFFF);
+            ui_texto(170, 394 + nl * 22 + 8, 1, "○ Aceptar     × Rechazar", 0xFFE860FF);
+        }
+        if (hablando >= 0) dialogo_dibujar();
+        else if (en_carro < 0 && anim <= 0) {
+            int q = npc_cercano(jugador.x, jugador.z, 2.4f);
+            if (q >= 0) {
+                char t[80]; snprintf(t, sizeof(t), "○ Hablar con %s", npc_nombre(q));
+                int w = (int)ui_ancho(t, 1);
+                ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
+                ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
+            } else if (vehiculo_cercano(jugador.x, jugador.z, 3.5f) < 0) {
+                char L = lugar_entrada_cerca(jugador.x, jugador.z, 2.5f);
+                if (L && interior_hay(L)) {
+                    char t[80]; snprintf(t, sizeof(t), "△ Entrar: %s", interior_nombre(L));
+                    int w = (int)ui_ancho(t, 1);
+                    ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
+                    ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
+                }
+            }
+        }
+        if (fund > 0) ui_rect(0, 0, 960, 544, (unsigned)(fund * 255 / 14));
+        ui_fin();
+
+        brick3ds_present();
     }
 
-    if (world_positions) linearFree(world_positions);
-    if (world_colors) linearFree(world_colors);
-    free(build_vertices);
-    shaderProgramFree(&program);
-    DVLB_Free(vshader_dvlb);
-    C3D_RenderTargetDelete(target);
-    C3D_Fini();
-    romfsExit();
-    gfxExit();
-    return 0;
+    brick_renderer_exit(); romfsExit(); gfxExit(); return 0;
 }
