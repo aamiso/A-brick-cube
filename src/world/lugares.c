@@ -11,8 +11,13 @@
 
 #define LADO        0.5f     // cuánto mide cada cubito en el mundo (media celda)
 #define MAX_LUGARES 1500
+#ifdef __3DS__
+#define RADIO_MODELO 58.0f   // alcance menor para aliviar la GPU de 3DS
+#define RADIO_CAJA   90.0f
+#else
 #define RADIO_MODELO 72.0f   // hasta dónde se dibuja el modelo completo
 #define RADIO_CAJA   115.0f  // más lejos se dibuja una cajita simple
+#endif
 #define CAPA_PARED   2       // capa donde se mira si hay pared (choque)
 
 typedef struct {
