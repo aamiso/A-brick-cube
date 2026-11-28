@@ -159,6 +159,10 @@ void glBufferData(unsigned int target,long size,const void *data,unsigned int us
     if(data)memcpy(b->data,data,(size_t)size);
     if(b->linear)GSPGPU_FlushDataCache(b->data,(u32)size);
 }
+int brick3ds_buffer_valid(unsigned int id,size_t minimum_size){
+    return id>0&&id<BUFFER_MAX&&buffers[id].used&&buffers[id].data&&buffers[id].size>=minimum_size;
+}
+
 void glDeleteBuffers(int n,const unsigned int *ids){
     for(int i=0;i<n;i++){
         unsigned id=ids[i];
