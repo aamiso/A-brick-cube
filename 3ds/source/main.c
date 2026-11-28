@@ -38,8 +38,7 @@ static int brick_renderer_init(void){
  if(!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE))return 0;
  brick_target=C3D_RenderTargetCreate(240,400,GPU_RB_RGBA8,GPU_RB_DEPTH24_STENCIL8);if(!brick_target)return 0;
  C3D_RenderTargetSetOutput(brick_target,GFX_TOP,GFX_LEFT,brick_transfer_flags);
- extern const u8 vshader_shbin[];extern const u32 vshader_shbin_size;
- brick_shader=DVLB_ParseFile((u32*)vshader_shbin,vshader_shbin_size);if(!brick_shader)return 0;
+  brick_shader=DVLB_ParseFile((u32*)vshader_shbin,vshader_shbin_size);if(!brick_shader)return 0;
  shaderProgramInit(&brick_program);shaderProgramSetVsh(&brick_program,&brick_shader->DVLE[0]);C3D_BindProgram(&brick_program);
  brick_u_projection=shaderInstanceGetUniformLocation(brick_program.vertexShader,"projection");
  brick_u_modelview=shaderInstanceGetUniformLocation(brick_program.vertexShader,"modelView");
