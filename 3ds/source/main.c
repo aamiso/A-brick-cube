@@ -71,13 +71,13 @@ static void brick_renderer_exit(void){if(brick_target)C3D_RenderTargetDelete(bri
 
 int main(void) {
     gfxInitDefault(); consoleInit(GFX_BOTTOM,NULL);
-    if(R_FAILED(romfsInit())) { printf("No se pudo montar ROMFS.\\n"); gfxExit(); return 1; }
-    if(!brick_renderer_init()) { printf("No se pudo iniciar Citro3D/shader.\\n"); romfsExit(); gfxExit(); return 1; }
+    if(R_FAILED(romfsInit())) { printf("No se pudo montar ROMFS.\n"); gfxExit(); return 1; }
+    if(!brick_renderer_init()) { printf("No se pudo iniciar Citro3D/shader.\n"); romfsExit(); gfxExit(); return 1; }
     cubo_construir();
 
     // Lee el mapa (si no lo encuentra, usa uno chiquito incluido en el juego)
     int mapa_original = ciudad_cargar("romfs:/mapas/ciudad.txt");
-    printf(mapa_original ? "Mapa original: %d x %d\\n" : "AVISO: mapa original no encontrado; se usa emergencia (%d x %d)\\n", ciudad_ancho(), ciudad_alto());
+    printf(mapa_original ? "Mapa original: %d x %d\n" : "AVISO: mapa original no encontrado; se usa emergencia (%d x %d)\n", ciudad_ancho(), ciudad_alto());
     fflush(stdout);
 
     Jugador jugador;
