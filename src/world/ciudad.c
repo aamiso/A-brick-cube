@@ -80,10 +80,6 @@ static int bakes_restantes = 0;
 #define MAX_G 26
 typedef struct { Malla m; char listo; } Grupo;
 #define GRUPO_LIBERAR(g) do { malla_liberar(&(g)->m); (g)->listo = 0; } while (0)
-#else
-typedef struct { Malla m; char listo; } Grupo;
-#define GRUPO_LIBERAR(g) do { malla_liberar(&(g)->m); (g)->listo = 0; } while (0)
-#endif
 static Grupo grupos[MAX_G][MAX_G];
 static Malla lejano;            // calles, aceras y agua de todo el mapa (una sola malla)
 static int lejano_listo = 0;
