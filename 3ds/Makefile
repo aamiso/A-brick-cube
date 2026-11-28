@@ -58,7 +58,7 @@ $(BUILD):
 
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).3dsx $(TARGET).elf $(TARGET).smdh icon.png
+	@rm -fr $(BUILD) $(TARGET).3dsx $(TARGET).elf $(TARGET).smdh
 
 else
 
@@ -71,11 +71,8 @@ $(SHADER_HEADER): $(TOPDIR)/source/vshader.v.pica | $(DEPSDIR)
 
 main.o: $(SHADER_HEADER)
 
-icon.png :
-	@python3 -c "import struct, zlib; w=h=48; raw=b''.join(b'\x00'+b'\x30\x70\xc0\xff'*w for _ in range(h)); png=b'\x89PNG\r\n\x1a\n'+b''.join(struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff) for t,d in [(b'IHDR',struct.pack('>IIBBBBB',w,h,8,6,0,0,0)),(b'IDAT',zlib.compress(raw)),(b'IEND',b'')]); open('$@','wb').write(png)"
-
-$(OUTPUT).smdh : icon.png
-	@$(SMDHTOOL) --create "$(APP_TITLE)" "$(APP_DESC)" "$(APP_AUTHOR)" $< $@
+$(OUTPUT).smdh : $(TOPDIR)/icon.png
+	@$(SMDHTOOL) --create "$(APP_TITLE)" "$(APP_DESC)" "$(APP_AUTHOR)" $(TOPDIR)/icon.png $@
 
 $(OUTPUT).3dsx : $(OUTPUT).elf $(OUTPUT).smdh
 	@3dsxtool $< $@ --smdh=$(OUTPUT).smdh $(_3DSXFLAGS)
