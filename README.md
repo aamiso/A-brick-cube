@@ -67,7 +67,7 @@ A Brick Cube is planned to grow with a story that expands its world and characte
 ## Downloads
 
 - **PlayStation Vita:** [Download the published alpha release](https://github.com/aamiso/A-brick-cube/releases/tag/game). The current release contains a Vita VPK.
-- **Nintendo 3DS:** [View 3DS builds on GitHub Actions](https://github.com/aamiso/A-brick-cube/actions/workflows/build-3ds.yml). Successful runs provide a `.3dsx` artifact. Check the Releases page for an official 3DS package.
+- **Nintendo 3DS:** [View 3DS builds on GitHub Actions](https://github.com/aamiso/A-brick-cube/actions/workflows/build-3ds.yml). Successful runs provide an installable `.cia` artifact. Check the Releases page for official packages.
 
 ## Build from source
 
@@ -91,7 +91,7 @@ cd 3ds
 make
 ```
 
-See the [3DS build workflow](.github/workflows/build-3ds.yml).
+Running `make` creates a development `.3dsx`; the [3DS build workflow](.github/workflows/build-3ds.yml) packages the installable `.cia`.
 
 ## Project status
 
@@ -144,7 +144,7 @@ A Brick Cube planea crecer con una historia que amplíe su mundo y sus personaje
 ### Descargas
 
 - **PlayStation Vita:** [Descargar la versión alpha publicada](https://github.com/aamiso/A-brick-cube/releases/tag/game). La release actual contiene un archivo VPK para Vita.
-- **Nintendo 3DS:** [Ver las compilaciones de 3DS en GitHub Actions](https://github.com/aamiso/A-brick-cube/actions/workflows/build-3ds.yml). Las compilaciones exitosas generan un artefacto `.3dsx`. Revisa Releases para encontrar una versión oficial para 3DS.
+- **Nintendo 3DS:** [Ver las compilaciones de 3DS en GitHub Actions](https://github.com/aamiso/A-brick-cube/actions/workflows/build-3ds.yml). Las compilaciones exitosas generan un artefacto instalable `.cia`. Revisa Releases para encontrar paquetes oficiales.
 
 ### Compilar desde el código fuente
 
@@ -168,7 +168,7 @@ cd 3ds
 make
 ```
 
-Consulta el [flujo de compilación de 3DS](.github/workflows/build-3ds.yml).
+`make` crea un `.3dsx` de desarrollo; el [flujo de compilación de 3DS](.github/workflows/build-3ds.yml) lo empaqueta como `.cia` instalable.
 
 ### Estado del proyecto
 
