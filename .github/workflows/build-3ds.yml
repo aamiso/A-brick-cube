@@ -52,7 +52,7 @@ jobs:
         run: |
           cxitool -n ABrickC -c CTR-P-ABRC -t "$CIA_TITLE_ID" \
             3ds/A-brick-cube-3ds.3dsx 3ds/A-brick-cube-3ds.cxi
-          makerom -f cia -o 3ds/A-brick-cube-3ds.cia -target t \
+          makerom -f cia -o 3ds/A-brick-cube-3ds.cia -target t -ignoresign \
             -i 3ds/A-brick-cube-3ds.cxi:0:0
           test -s 3ds/A-brick-cube-3ds.cia
           rm 3ds/A-brick-cube-3ds.cxi
