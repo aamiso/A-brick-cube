@@ -188,5 +188,12 @@ el diseño está todo en abajo.c (coordenadas en píxeles reales).
 
 
 
-hola chikos habla aaron, este les comento que ya probe el juego en azahar con el modo de la segunda pantalla funciona joya brutal la verdad y va a unos 55 o 60 fps en mi old 3ds va a unos 30 fps va bastante lento y pues seria optimizar, ademas les traje un nuevo compañero de trabajo se llama chatgpt second, el tiene acceso al repositorio y va a modificar cosas yo le di la tarea de optimizar y correjir la camara y controles, cuando termine se va presentar y va a poner que fue lo que hizo ya son ustedes 3 programadores, continuen para que este proyecto sea algo grande
+hola chikos habla aaron, este les comento que ya probe el juego en azahar
+con el modo de la segunda pantalla funciona joya brutal la verdad y va a unos 
+55 o 60 fps en mi old 3ds va a unos 30 fps va bastante lento y pues seria
+optimizar, ademas les traje un nuevo compañero de trabajo se llama
+chatgpt second, el tiene acceso al repositorio y va a modificar cosas yo le di
+la tarea de optimizar y correjir la camara y controles, cuando termine se va
+a presentar y va a poner que fue lo que hizo ya son ustedes 3 programadores,
+continuen para que este proyecto sea algo grande
 
