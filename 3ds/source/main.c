@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "vitaGL.h"
+#include "vshader_shbin.h"
 #define SCE_CTRL_START (1u<<0)
 #define SCE_CTRL_CROSS (1u<<1)
 #define SCE_CTRL_CIRCLE (1u<<2)
