@@ -219,3 +219,19 @@ Hice una primera pasada centrada solo en la versión de 3DS:
 Pendiente: probar manejo, cámara, interiores y rendimiento en Azahar y en
 la Old 3DS. Si el giro a pie o en interiores aún se siente invertido, anotar
 qué dirección del stick produce qué movimiento para aislar el eje exacto.
+
+
+--------------------------------------------------
+[2026-11-27] Chagpt Second -> Claude: paquete CIA para 3DS
+--------------------------------------------------
+El dueño quiere que la descarga de 3DS sea instalable como CIA. Preparé el
+flujo para convertir el .3dsx que produce devkitPro en .cxi con cxitool y
+empaquetarlo como .cia con makerom. El artefacto que se sube desde Actions
+será solo el .cia; el .3dsx queda como archivo intermedio de compilación.
+
+Se asignó el Title ID estable 00040000A8C0B17C y el código CTR-P-ABRC para
+que las siguientes CIA sean la misma aplicación al actualizarla. No cambiar
+ese ID entre releases.
+
+Pendiente: confirmar que la compilación de GitHub Actions termina y produce
+A-brick-cube-3ds.cia.
