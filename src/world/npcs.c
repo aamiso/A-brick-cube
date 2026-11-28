@@ -178,7 +178,11 @@ void npcs_dibujar(float px, float pz) {
     for (int i = 0; i < n_npc; i++) {
         const Npc *n = &npcs[i];
         if (n->muerto) continue;
+#ifdef __3DS__
+        if (fabsf(n->x - px) > 48.0f || fabsf(n->z - pz) > 48.0f) continue;
+#else
         if (fabsf(n->x - px) > 60.0f || fabsf(n->z - pz) > 60.0f) continue;
+#endif
         personaje_dibujar(&var[n->variante], n->x, n->z, n->ang, n->vel, n->fase, n->tiempo, 0.0f);
         if (npc_da_mision(i) && !mision_activa() && !n->hablando) {          // cubito amarillo flotando: ofrece una misión
             cubo_activar();
