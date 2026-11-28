@@ -1,6 +1,7 @@
 TARGET      := A-brick-cube-3ds
 BUILD       := build
 SOURCES     := source
+ORIGINAL    := ../src/core ../src/engine ../src/player ../src/world ../src/ui
 INCLUDES    := source ../src
 ROMFS       := ../data
 
@@ -32,10 +33,10 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 export OUTPUT   := $(CURDIR)/$(TARGET)
 export SHADER_HEADER := $(CURDIR)/$(BUILD)/vshader_shbin.h
 export TOPDIR   := $(CURDIR)
-export VPATH    := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
+export VPATH    := $(foreach dir,$(SOURCES) $(ORIGINAL),$(CURDIR)/$(dir))
 export DEPSDIR  := $(CURDIR)/$(BUILD)
 
-CFILES      := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+CFILES      := $(notdir $(wildcard source/*.c)) $(foreach dir,$(ORIGINAL),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES    := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES      := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 
