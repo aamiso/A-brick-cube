@@ -317,7 +317,7 @@ int main(void) {
             // R = acelerar, L = freno / reversa, stick (arriba/abajo) hace lo mismo, cuadrado = freno de mano
             float gas = (pad.buttons & SCE_CTRL_RTRIGGER) ? 1.0f : (ly < 0.0f ? -ly : 0.0f);
             float frn = (pad.buttons & SCE_CTRL_LTRIGGER) ? 1.0f : (ly > 0.0f ? ly : 0.0f);
-            vehiculo_manejar(en_carro, -lx, gas, frn, (pad.buttons & SCE_CTRL_SQUARE) != 0);
+            vehiculo_manejar(en_carro, lx, gas, frn, (pad.buttons & SCE_CTRL_SQUARE) != 0);   // mismo sentido que en Vita
             vehiculo_pos(en_carro, &fx, &fz, &ang, &vel);
             vehiculo_velocidad(en_carro, &vx, &vz);
             // Cámara de persecución: va detrás del carro con un poco de retraso; el stick derecho mira alrededor
