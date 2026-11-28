@@ -1,4 +1,4 @@
-name: Build 3DS
+name: Build 3DS CIA
 
 on:
   push:
@@ -14,25 +14,53 @@ jobs:
       DEVKITPRO: /opt/devkitpro
       DEVKITARM: /opt/devkitpro/devkitARM
       CTRULIB: /opt/devkitpro/libctru
+      # Keep this Title ID stable so new CIA releases update the same app.
+      CIA_TITLE_ID: 00040000A8C0B17C
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Compilar .3dsx
+      - name: Prepare CIA packaging tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends autoconf automake
+          git clone https://github.com/devkitPro/3dstools.git /tmp/3dstools
+          git -C /tmp/3dstools checkout --detach 26a73b75d37db9c5be2e6ea172ddfc0c6f278bea
+          cd /tmp/3dstools
+          ./autogen.sh
+          ./configure
+          make -j"$(nproc)" cxitool
+          install -m 0755 cxitool /usr/local/bin/cxitool
+          curl -fsSL --retry 3 \
+            https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64.zip \
+            -o /tmp/makerom.zip
+          mkdir -p /tmp/makerom
+          unzip -q /tmp/makerom.zip -d /tmp/makerom
+          makerom_path="$(find /tmp/makerom -type f -name makerom -print -quit)"
+          test -n "$makerom_path"
+          install -m 0755 "$makerom_path" /usr/local/bin/makerom
+
+      - name: Build 3DS executable
         run: |
           export PATH="$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH"
-          echo "=== Archivos en 3ds/source ==="
-          ls -la 3ds/source || true
+          echo "=== 3DS source files ==="
+          ls -la 3ds/source
           cd 3ds
-          make -j$(nproc)
-          echo "=== Archivos .3dsx encontrados ==="
-          find .. -name "*.3dsx" -ls
+          make -j"$(nproc)"
 
-      - name: Subir artefacto 3DS
+      - name: Package installable CIA
+        run: |
+          cxitool -n ABrickC -c CTR-P-ABRC -t "$CIA_TITLE_ID" \
+            3ds/A-brick-cube-3ds.3dsx 3ds/A-brick-cube-3ds.cxi
+          makerom -f cia -o 3ds/A-brick-cube-3ds.cia -target t \
+            -i 3ds/A-brick-cube-3ds.cxi:0:0
+          test -s 3ds/A-brick-cube-3ds.cia
+          rm 3ds/A-brick-cube-3ds.cxi
+          ls -lh 3ds/A-brick-cube-3ds.cia
+
+      - name: Upload CIA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: A-brick-cube-3ds
-          path: |
-            3ds/A-brick-cube-3ds.3dsx
-            3ds/build/*.3dsx
+          name: A-brick-cube-3ds-cia
+          path: 3ds/A-brick-cube-3ds.cia
           if-no-files-found: error
