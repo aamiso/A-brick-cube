@@ -1,11 +1,10 @@
 // A Brick Cube Vita - Fase 5: ciudad voxel con casas, banco y café (modelos), calles con detalle y personaje animado (data/mapas/ciudad.txt)
 //
 // Controles:
-//   Stick izquierdo = caminar (o manejar)
-//   R = correr (mantener)    X = saltar    L = cambiar de cámara (normal / sobre el hombro)
-//   TRIÁNGULO = subir / bajar del carro    CUADRADO = freno de mano
-//   Stick derecho   = girar la cámara (izq/der) y subirla o bajarla (arriba/abajo)
-//   START           = salir
+//   Circle Pad = caminar / conducir
+//   R = correr o acelerar; A = saltar; B = hablar/aceptar; X = entrar/salir del carro
+//   L = alternar cámara; cruceta = girar e inclinar la cámara; Y = freno de mano
+//   START = salir
 
 #include <3ds.h>
 #include <citro3d.h>
@@ -84,6 +83,7 @@ int main(void) {
     ciudad_inicio(&jugador.x, &jugador.z); // empieza donde dice la P del mapa
     ciudad_precalentar(jugador.x, jugador.z);
     camara_iniciar(&camara);
+    camara.hombro = 1; // Usa el modo de hombro original (distancia objetivo 2.7), no una cámara recreada.
     vehiculos_iniciar(jugador.x, jugador.z);
     npcs_iniciar(jugador.x, jugador.z);
     int en_carro = -1;
