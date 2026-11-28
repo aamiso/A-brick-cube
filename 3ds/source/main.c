@@ -33,7 +33,7 @@ static const u32 brick_transfer_flags =
 void brick3ds_set_identity_uniforms(void){C3D_Mtx m;Mtx_Identity(&m);C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,brick_u_projection,&m);C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,brick_u_modelview,&m);}
 void brick3ds_frame_begin(void){C3D_FrameBegin(C3D_FRAME_SYNCDRAW);C3D_FrameDrawOn(brick_target);}
 void brick3ds_present(void){C3D_FrameEnd(0);}
-void brick3ds_clear(float r,float g,float b,float a,unsigned mask){u32 rgba=C3D_RGBA8((u8)(r*255),(u8)(g*255),(u8)(b*255),(u8)(a*255));u32 f=0;if(mask&GL_COLOR_BUFFER_BIT)f|=C3D_CLEAR_COLOR;if(mask&GL_DEPTH_BUFFER_BIT)f|=C3D_CLEAR_DEPTH;C3D_RenderTargetClear(brick_target,f,rgba,0);}
+void brick3ds_clear(float r,float g,float b,float a,unsigned mask){u32 rgba=((u32)(u8)(r*255)<<24)|((u32)(u8)(g*255)<<16)|((u32)(u8)(b*255)<<8)|(u32)(u8)(a*255);u32 f=0;if(mask&GL_COLOR_BUFFER_BIT)f|=C3D_CLEAR_COLOR;if(mask&GL_DEPTH_BUFFER_BIT)f|=C3D_CLEAR_DEPTH;C3D_RenderTargetClear(brick_target,f,rgba,0);}
 static int brick_renderer_init(void){
  if(!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE))return 0;
  brick_target=C3D_RenderTargetCreate(240,400,GPU_RB_RGBA8,GPU_RB_DEPTH24_STENCIL8);if(!brick_target)return 0;
