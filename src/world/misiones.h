@@ -10,4 +10,8 @@ void mision_dibujar_3d(float x, float z);          // rayo amarillo en el destin
 void mision_dibujar_hud(void);                     // dentro de ui_inicio / ui_fin
 int  mision_marca(float *x, float *z);             // 1 si hay destino para el minimapa
 int  mision_dinero(void);
+void mision_poner_dinero(int d);                   // al cargar partida
+const char *mision_titulo(void);                   // título de la misión activa (o "")
+void mision_estado(char *t, int n);                // "Tiempo 1:23" / "Choques 1/3 · Tiempo ..."
+const char *mision_mensaje(int *ok);               // aviso de cumplida/fallida (NULL si no hay)
 #endif

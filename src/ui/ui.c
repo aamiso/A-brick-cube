@@ -8,6 +8,9 @@
 static float pos[MAXV * 3];
 static unsigned char col[MAXV * 4];
 static int nv = 0;
+static float off_x = 0, off_y = 0;    // ui_desplazar
+
+void ui_desplazar(float dx, float dy) { off_x = dx; off_y = dy; }
 
 static void vaciar(void) {
     if (nv == 0) return;
@@ -18,11 +21,21 @@ static void vaciar(void) {
 }
 
 void ui_inicio(void) {
-    nv = 0;
+    nv = 0; off_x = off_y = 0;
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glLoadIdentity();
     /* 960x544 centrado en 400x240, conservando la proporción de los elementos. */
     glOrtho(0.0f, 960.0f, 560.0f, -16.0f, -1.0f, 1.0f);
+    glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+}
+
+void ui_inicio_area(float w, float h) {
+    nv = 0; off_x = off_y = 0;
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glLoadIdentity();
+    glOrtho(0.0f, w, h, 0.0f, -1.0f, 1.0f);
     glMatrixMode(GL_MODELVIEW); glLoadIdentity();
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
@@ -37,6 +50,7 @@ void ui_fin(void) {
 
 void ui_rect(float x, float y, float w, float h, unsigned rgba) {
     if (nv + 6 > MAXV) vaciar();
+    x += off_x; y += off_y;
     float q[6][2] = { {x, y}, {x + w, y}, {x + w, y + h}, {x, y}, {x + w, y + h}, {x, y + h} };
     for (int i = 0; i < 6; i++) {
         pos[nv * 3] = q[i][0]; pos[nv * 3 + 1] = q[i][1]; pos[nv * 3 + 2] = 0.0f;

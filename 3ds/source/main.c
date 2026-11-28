@@ -23,7 +23,7 @@
 typedef struct { unsigned buttons; unsigned char lx,ly; } SceCtrlData;
 static DVLB_s *brick_shader;
 static shaderProgram_s brick_program;
-static C3D_RenderTarget *brick_target;
+static C3D_RenderTarget *brick_target, *brick_bottom, *brick_current;
 static int brick_u_mvp;
 extern void brick3ds_compat_init(void);
 extern void brick3ds_compat_frame_begin(void);
@@ -33,14 +33,18 @@ static const u32 brick_transfer_flags =
  GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8)|GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8)|
  GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO);
 void brick3ds_set_mvp(const C3D_Mtx *m){C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,brick_u_mvp,m);}
-void brick3ds_frame_begin(void){C3D_FrameBegin(C3D_FRAME_SYNCDRAW);brick3ds_compat_frame_begin();C3D_FrameDrawOn(brick_target);}
+void brick3ds_frame_begin(void){C3D_FrameBegin(C3D_FRAME_SYNCDRAW);brick3ds_compat_frame_begin();C3D_FrameDrawOn(brick_target);brick_current=brick_target;}
+static void brick3ds_draw_bottom(void){C3D_FrameDrawOn(brick_bottom);brick_current=brick_bottom;}
 extern void brick3ds_flush(void);
 void brick3ds_present(void){brick3ds_flush();C3D_FrameEnd(0);}
-void brick3ds_clear(float r,float g,float b,float a,unsigned mask){u32 rgba=((u32)(u8)(r*255)<<24)|((u32)(u8)(g*255)<<16)|((u32)(u8)(b*255)<<8)|(u32)(u8)(a*255);u32 f=0;if(mask&GL_COLOR_BUFFER_BIT)f|=C3D_CLEAR_COLOR;if(mask&GL_DEPTH_BUFFER_BIT)f|=C3D_CLEAR_DEPTH;C3D_RenderTargetClear(brick_target,f,rgba,0);}
+void brick3ds_clear(float r,float g,float b,float a,unsigned mask){u32 rgba=((u32)(u8)(r*255)<<24)|((u32)(u8)(g*255)<<16)|((u32)(u8)(b*255)<<8)|(u32)(u8)(a*255);u32 f=0;if(mask&GL_COLOR_BUFFER_BIT)f|=C3D_CLEAR_COLOR;if(mask&GL_DEPTH_BUFFER_BIT)f|=C3D_CLEAR_DEPTH;C3D_RenderTargetClear(brick_current?brick_current:brick_target,f,rgba,0);}
 static int brick_renderer_init(void){
  if(!C3D_Init(0x100000))return 0;   /* 1 MB: la ciudad hace muchos dibujos por cuadro */
  brick_target=C3D_RenderTargetCreate(240,400,GPU_RB_RGBA8,GPU_RB_DEPTH24_STENCIL8);if(!brick_target)return 0;
  C3D_RenderTargetSetOutput(brick_target,GFX_TOP,GFX_LEFT,brick_transfer_flags);
+ /* Pantalla de abajo (320x240): hora, dinero, minimapa y textos */
+ brick_bottom=C3D_RenderTargetCreate(240,320,GPU_RB_RGBA8,GPU_RB_DEPTH16);if(!brick_bottom)return 0;
+ C3D_RenderTargetSetOutput(brick_bottom,GFX_BOTTOM,GFX_LEFT,brick_transfer_flags);
   brick_shader=DVLB_ParseFile((u32*)vshader_shbin,vshader_shbin_size);if(!brick_shader)return 0;
  shaderProgramInit(&brick_program);shaderProgramSetVsh(&brick_program,&brick_shader->DVLE[0]);C3D_BindProgram(&brick_program);
  brick_u_mvp=shaderInstanceGetUniformLocation(brick_program.vertexShader,"mvp");
@@ -48,7 +52,7 @@ static int brick_renderer_init(void){
  C3D_TexEnv *e=C3D_GetTexEnv(0);C3D_TexEnvInit(e);C3D_TexEnvSrc(e,C3D_Both,GPU_PRIMARY_COLOR,0,0);C3D_TexEnvFunc(e,C3D_Both,GPU_REPLACE);
  C3D_DepthMap(true,-1.0f,0.0f);C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);C3D_CullFace(GPU_CULL_NONE);return 1;
 }
-static void brick_renderer_exit(void){brick3ds_compat_exit();if(brick_target)C3D_RenderTargetDelete(brick_target);shaderProgramFree(&brick_program);if(brick_shader)DVLB_Free(brick_shader);C3D_Fini();}
+static void brick_renderer_exit(void){brick3ds_compat_exit();if(brick_bottom)C3D_RenderTargetDelete(brick_bottom);if(brick_target)C3D_RenderTargetDelete(brick_target);shaderProgramFree(&brick_program);if(brick_shader)DVLB_Free(brick_shader);C3D_Fini();}
 
 #include "core/entrada.h"
 #include "engine/cubo.h"
@@ -68,24 +72,58 @@ static void brick_renderer_exit(void){brick3ds_compat_exit();if(brick_target)C3D
 #include "world/lugares.h"
 #include "ui/ui.h"
 #include "ui/dialogo.h"
+#include "abajo.h"
+#include "guardado.h"
 #include <math.h>
 #include <stdio.h>
 
+/* Dibuja la pantalla de abajo (después de la de arriba, dentro del mismo cuadro). */
+static void dibujar_abajo(const EstadoAbajo *e) {
+    brick3ds_draw_bottom();
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    ui_inicio_area(ABAJO_W, ABAJO_H);
+    abajo_dibujar(e);
+    ui_fin();
+}
+
+/* Error antes de poder dibujar: lo muestra en la pantalla de abajo y espera START. */
+static int error_fatal(const char *msg) {
+    consoleInit(GFX_BOTTOM, NULL);
+    printf("%s\n\nPulsa START para salir.\n", msg);
+    while (aptMainLoop()) { hidScanInput(); if (hidKeysDown() & KEY_START) break; gspWaitForVBlank(); }
+    return 1;
+}
+
 int main(void) {
-    gfxInitDefault(); consoleInit(GFX_BOTTOM,NULL);
-    if(R_FAILED(romfsInit())) { printf("No se pudo montar ROMFS.\n"); gfxExit(); return 1; }
-    if(!brick_renderer_init()) { printf("No se pudo iniciar Citro3D/shader.\n"); romfsExit(); gfxExit(); return 1; }
+    gfxInitDefault();
+    if(R_FAILED(romfsInit())) { error_fatal("No se pudo montar ROMFS."); gfxExit(); return 1; }
+    if(!brick_renderer_init()) { error_fatal("No se pudo iniciar Citro3D/shader."); romfsExit(); gfxExit(); return 1; }
     cubo_construir();
 
     // Lee el mapa (si no lo encuentra, usa uno chiquito incluido en el juego)
     int mapa_original = ciudad_cargar("romfs:/mapas/ciudad.txt");
-    printf(mapa_original ? "Mapa original: %d x %d\n" : "AVISO: mapa original no encontrado; se usa emergencia (%d x %d)\n", ciudad_ancho(), ciudad_alto());
-    fflush(stdout);
+    (void)mapa_original;
 
     Jugador jugador;
     Camara camara;
     jugador_iniciar(&jugador);
     ciudad_inicio(&jugador.x, &jugador.z); // empieza donde dice la P del mapa
+
+    // --- Partida guardada (sdmc:/3ds/A-brick-cube/partida.dat) ---
+    const char *guardar_msg = NULL; int guardar_t = 0, guardar_ok = 0;
+    {
+        Partida pg;
+        if (guardado_leer(&pg)) {
+            if (!ciudad_choca(pg.x, pg.z, 0.45f)) {
+                jugador.x = pg.x; jugador.z = pg.z; jugador.angulo = pg.angulo;
+                jugador.suelo = jugador.elev = pg.suelo;
+            }
+            reloj_poner_hora(pg.hora);
+            mision_poner_dinero(pg.dinero);
+            guardar_msg = "Partida cargada"; guardar_ok = 1; guardar_t = 180;
+        }
+    }
     ciudad_precalentar(jugador.x, jugador.z);
     camara_iniciar(&camara);
     camara.hombro = 1; // Usa el modo de hombro original (distancia objetivo 2.7), no una cámara recreada.
@@ -106,6 +144,10 @@ int main(void) {
     while (aptMainLoop()) {
         hidScanInput(); u32 down=hidKeysDown(), held=hidKeysHeld();
         if(down&KEY_START)break;
+        touchPosition tp; hidTouchRead(&tp);
+        int toca_boton = (held & KEY_TOUCH) && tp.px >= BOTON_X && tp.px < BOTON_X + BOTON_W && tp.py >= BOTON_Y && tp.py < BOTON_Y + BOTON_H;
+        int pide_guardar = (down & KEY_SELECT) || ((down & KEY_TOUCH) && toca_boton);
+        if (guardar_t > 0 && --guardar_t == 0) guardar_msg = NULL;
         circlePosition cp;hidCircleRead(&cp);
         SceCtrlData pad;pad.buttons=0;
         if(held&KEY_A)pad.buttons|=SCE_CTRL_CROSS;
@@ -171,20 +213,21 @@ int main(void) {
             jugador_dibujar(&jugador);
             cubo_desactivar();
             ui_inicio();
-            { const char *tt = interior_titulo(); int w = (int)ui_ancho(tt, 1);
-              ui_rect(14, 14, w + 28, 30, 0x000000B4); ui_texto(28, 20, 1, tt, 0xFFFFFFFF); }
-            if (hablando_i >= 0) dialogo_dibujar();
-            else {
-                int q = interior_npc_cercano(&jugador, 1.7f);
-                if (q >= 0) {
-                    char t[80]; snprintf(t, sizeof(t), "○ Hablar con %s", interior_npc_nombre(q));
-                    int w = (int)ui_ancho(t, 1);
-                    ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
-                    ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
-                }
-            }
             if (fund > 0) ui_rect(0, 0, 960, 544, (unsigned)(fund * 255 / 14));
             ui_fin();
+            if (pide_guardar) { guardar_msg = "Sal a la calle para guardar."; guardar_ok = 0; guardar_t = 150; }
+            {
+                static char aviso_i[80];
+                EstadoAbajo ea = {0};
+                ea.px = jugador.x; ea.pz = jugador.z; ea.ang = jugador.angulo;
+                ea.lugar = interior_titulo();
+                if (hablando_i < 0) {
+                    int q = interior_npc_cercano(&jugador, 1.7f);
+                    if (q >= 0) { snprintf(aviso_i, sizeof(aviso_i), "B: Hablar con %s", interior_npc_nombre(q)); ea.aviso = aviso_i; }
+                }
+                ea.guardado_msg = guardar_msg; ea.guardado_ok = guardar_ok; ea.boton_apretado = toca_boton;
+                dibujar_abajo(&ea);
+            }
             brick3ds_present();
             continue;
         }
@@ -316,40 +359,45 @@ int main(void) {
         else { float cx2, cz2, a2, v2; vehiculo_pos(en_carro, &cx2, &cz2, &a2, &v2); float rl, pt, al; vehiculo_inclinacion(en_carro, &rl, &pt, &al); jugador_dibujar_en_carro(&jugador, cx2, cz2, a2, rl, pt, al); }
         cubo_desactivar();
 
-        // 3) Interfaz 2D
+        // 3) Arriba: solo el filtro de noche y el fundido
         ui_inicio();
         reloj_filtro();                                       // noche / atardecer
-        { float mx2 = fx, mz2 = fz; (void)mx2; (void)mz2;
-          { float mkx = 0, mkz = 0; int hm = mision_marca(&mkx, &mkz); minimapa_dibujar(fx, fz, en_carro >= 0 ? 0.0f : jugador.angulo, hm, mkx, mkz); }
-          char hh[16]; int h = (int)reloj_hora(), mi = (int)((reloj_hora() - h) * 60.0f); snprintf(hh, sizeof(hh), "%02d:%02d", h, mi);
-          ui_rect(14, 14, 88, 30, 0x000000B4); ui_texto(22, 20, 1, hh, 0xFFFFFFFF); }
-        mision_dibujar_hud();
-        if (oferta) {
-            char ln[4][96]; int nl = ui_partir(mision_oferta(), 1, 640, ln, 4);
-            ui_rect(150, 380, 660, 30 + nl * 22 + 34, 0x000000D0);
-            for (int i = 0; i < nl; i++) ui_texto(170, 394 + i * 22, 1, ln[i], 0xFFFFFFFF);
-            ui_texto(170, 394 + nl * 22 + 8, 1, "○ Aceptar     × Rechazar", 0xFFE860FF);
-        }
-        if (hablando >= 0) dialogo_dibujar();
-        else if (en_carro < 0 && anim <= 0) {
-            int q = npc_cercano(jugador.x, jugador.z, 2.4f);
-            if (q >= 0) {
-                char t[80]; snprintf(t, sizeof(t), "○ Hablar con %s", npc_nombre(q));
-                int w = (int)ui_ancho(t, 1);
-                ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
-                ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
-            } else if (vehiculo_cercano(jugador.x, jugador.z, 3.5f) < 0) {
-                char L = lugar_entrada_cerca(jugador.x, jugador.z, 2.5f);
-                if (L && interior_hay(L)) {
-                    char t[80]; snprintf(t, sizeof(t), "△ Entrar: %s", interior_nombre(L));
-                    int w = (int)ui_ancho(t, 1);
-                    ui_rect(480 - w / 2 - 12, 440, w + 24, 34, 0x000000B4);
-                    ui_texto(480 - w / 2, 448, 1, t, 0xFFFFFFFF);
-                }
-            }
-        }
         if (fund > 0) ui_rect(0, 0, 960, 544, (unsigned)(fund * 255 / 14));
         ui_fin();
+
+        // 4) Guardar partida (solo a pie, en la calle y sin conversación)
+        if (pide_guardar) {
+            if (en_carro >= 0 || anim > 0) { guardar_msg = "Bájate del carro para guardar."; guardar_ok = 0; }
+            else if (hablando >= 0 || oferta || fase_f) { guardar_msg = "Termina de hablar primero."; guardar_ok = 0; }
+            else {
+                Partida pg;
+                pg.x = jugador.x; pg.z = jugador.z; pg.angulo = jugador.angulo; pg.suelo = jugador.suelo;
+                pg.hora = reloj_hora(); pg.dinero = mision_dinero();
+                guardar_ok = guardado_escribir(&pg);
+                guardar_msg = guardar_ok ? "¡Partida guardada!" : "No se pudo guardar. ¿Hay tarjeta SD?";
+            }
+            guardar_t = 150;
+        }
+
+        // 5) Pantalla de abajo: hora, dinero, minimapa, misión y textos
+        {
+            static char aviso_c[80];
+            EstadoAbajo ea = {0};
+            ea.px = fx; ea.pz = fz; ea.ang = en_carro >= 0 ? 0.0f : jugador.angulo;
+            ea.en_carro = en_carro >= 0;
+            if (oferta) ea.oferta = mision_oferta();
+            if (hablando < 0 && !oferta && en_carro < 0 && anim <= 0) {
+                int q = npc_cercano(jugador.x, jugador.z, 2.4f);
+                if (q >= 0) { snprintf(aviso_c, sizeof(aviso_c), "B: Hablar con %s", npc_nombre(q)); ea.aviso = aviso_c; }
+                else if (vehiculo_cercano(jugador.x, jugador.z, 3.5f) >= 0) ea.aviso = "X: Subir al carro";
+                else {
+                    char L = lugar_entrada_cerca(jugador.x, jugador.z, 2.5f);
+                    if (L && interior_hay(L)) { snprintf(aviso_c, sizeof(aviso_c), "X: Entrar a %s", interior_nombre(L)); ea.aviso = aviso_c; }
+                }
+            }
+            ea.guardado_msg = guardar_msg; ea.guardado_ok = guardar_ok; ea.boton_apretado = toca_boton;
+            dibujar_abajo(&ea);
+        }
 
         brick3ds_present();
     }

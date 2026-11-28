@@ -37,32 +37,39 @@ int dialogo_actualizar(int avanzar) {
 
 void dialogo_dibujar(void) {
     if (!g_activo) return;
-    const float x = 40, w = 880, h = 150, y = 544 - h - 24;
+    const float w = 880, h = 150;
+    dialogo_dibujar_en(40, 544 - h - 24, w, h, ESC);
+}
+
+void dialogo_dibujar_en(float x, float y, float w, float h, int esc) {
+    if (!g_activo) return;
+    const float k = (float)esc / ESC;          // bordes y márgenes proporcionales a la letra
+    const float b1 = 4 * k < 1 ? 1 : 4 * k, b2 = 8 * k < 2 ? 2 : 8 * k, b3 = 11 * k < 3 ? 3 : 11 * k;
     // nombre
-    float nw = ui_ancho(g_nombre, ESC) + 36;
-    ui_rect(x, y - 44, nw, 50, 0x202020ff); ui_rect(x + 4, y - 40, nw - 8, 46, 0xf8f8f8ff);
-    ui_texto(x + 18, y - 44 + 8, ESC, g_nombre, 0x303030ff);
+    float nw = ui_ancho(g_nombre, esc) + 36 * k, nh = 50 * k;
+    ui_rect(x, y - nh + 6 * k, nw, nh, 0x202020ff); ui_rect(x + b1, y - nh + 6 * k + b1, nw - 2 * b1, nh - b1, 0xf8f8f8ff);
+    ui_texto(x + 18 * k, y - nh + 14 * k, esc, g_nombre, 0x303030ff);
     // cuadro con borde doble (como Pokémon)
     ui_rect(x, y, w, h, 0x202020ff);
-    ui_rect(x + 4, y + 4, w - 8, h - 8, 0xf8f8f8ff);
-    ui_rect(x + 8, y + 8, w - 16, h - 16, 0x586878ff);
-    ui_rect(x + 11, y + 11, w - 22, h - 22, 0xfcfcfcff);
+    ui_rect(x + b1, y + b1, w - 2 * b1, h - 2 * b1, 0xf8f8f8ff);
+    ui_rect(x + b2, y + b2, w - 2 * b2, h - 2 * b2, 0x586878ff);
+    ui_rect(x + b3, y + b3, w - 2 * b3, h - 2 * b3, 0xfcfcfcff);
     // texto: solo las letras ya escritas
     char lin[4][96];
-    int nl = ui_partir(g_frases[g_i], ESC, w - 80, lin, 4);
+    int nl = ui_partir(g_frases[g_i], esc, w - 80 * k, lin, 4);
     int quedan = (int)g_letras;
     for (int l = 0; l < nl && quedan > 0; l++) {
         char tmp[96]; int n = 0, c = 0;
         const char *s = lin[l];
         while (*s && c < quedan) { tmp[n++] = *s++; while (((unsigned char)*s & 0xC0) == 0x80) tmp[n++] = *s++; c++; }
         tmp[n] = 0;
-        ui_texto(x + 40, y + 24 + l * 32, ESC, tmp, 0x303030ff);
+        ui_texto(x + 40 * k, y + 24 * k + l * 32 * k, esc, tmp, 0x303030ff);
         quedan -= c;
     }
     // flechita que parpadea cuando se terminó la frase
     if (g_letras >= g_total && (g_parpadeo / 20) % 2 == 0) {
-        float ax = x + w - 56, ay = y + h - 44;
-        ui_rect(ax, ay, 24, 6, 0xd02820ff); ui_rect(ax + 4, ay + 6, 16, 6, 0xd02820ff);
-        ui_rect(ax + 8, ay + 12, 8, 6, 0xd02820ff);
+        float ax = x + w - 56 * k, ay = y + h - 44 * k;
+        ui_rect(ax, ay, 24 * k, 6 * k, 0xd02820ff); ui_rect(ax + 4 * k, ay + 6 * k, 16 * k, 6 * k, 0xd02820ff);
+        ui_rect(ax + 8 * k, ay + 12 * k, 8 * k, 6 * k, 0xd02820ff);
     }
 }

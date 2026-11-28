@@ -41,6 +41,15 @@ static int acera_cerca(float x, float z, float *ox, float *oz) {
 
 int mision_activa(void) { return activa; }
 int mision_dinero(void) { return dinero; }
+void mision_poner_dinero(int d) { dinero = d < 0 ? 0 : d; }
+const char *mision_titulo(void) { return activa ? titulo : ""; }
+void mision_estado(char *t, int n) {
+    if (!activa) { if (n > 0) t[0] = 0; return; }
+    int s = tiempo / 60;
+    if (tipo == M_DESTRUCCION) snprintf(t, (size_t)n, "Choques %d/%d · Tiempo %d:%02d", vehiculos_choques() - choques_ini, choques_meta, s / 60, s % 60);
+    else snprintf(t, (size_t)n, "Tiempo %d:%02d", s / 60, s % 60);
+}
+const char *mision_mensaje(int *ok) { if (msg_t <= 0) return 0; if (ok) *ok = msg_ok; return msg; }
 const char *mision_oferta(void) { return texto; }
 
 int mision_preparar(float px, float pz) {

@@ -6,6 +6,7 @@ static float hora = 9.0f;
 
 void reloj_actualizar(void) { hora += 24.0f / (480.0f * 60.0f); if (hora >= 24.0f) hora -= 24.0f; }
 float reloj_hora(void) { return hora; }
+void reloj_poner_hora(float h) { while (h < 0) h += 24.0f; while (h >= 24.0f) h -= 24.0f; hora = h; }
 
 static float sol(void) { return sinf((hora - 6.0f) * 3.14159265f / 12.0f); }   // >0 de día
 static float suave(float a, float b, float x) { float t = (x - a) / (b - a); if (t < 0) t = 0; if (t > 1) t = 1; return t * t * (3 - 2 * t); }

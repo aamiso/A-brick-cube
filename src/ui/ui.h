@@ -3,8 +3,10 @@
 #define UI_UI_H
 
 void ui_inicio(void);                                  // empezar a dibujar la interfaz
+void ui_inicio_area(float w, float h);                 // igual, pero con un lienzo de w x h (pantalla de abajo de 3DS)
 void ui_fin(void);                                     // terminar (vuelve al modo 3D)
 void ui_rect(float x, float y, float w, float h, unsigned rgba);   // 0xRRGGBBAA
+void ui_desplazar(float dx, float dy);                 // mueve todo lo que se dibuje después (0,0 = normal)
 // Escribe texto (UTF-8). esc = tamaño de cada punto. Devuelve el ancho dibujado.
 float ui_texto(float x, float y, int esc, const char *txt, unsigned rgba);
 float ui_ancho(const char *txt, int esc);

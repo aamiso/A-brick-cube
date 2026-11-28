@@ -153,3 +153,35 @@ Si después de probar se ve la escena pero:
   - objetos lejanos tapan a los cercanos -> invertir el test de profundidad
     (GPU_GEQUAL <-> GPU_LEQUAL) o el signo de C3D_DepthMap.
 Propuesta de siguiente paso (cuando haya prueba): UI legible en 400x240.
+
+
+--------------------------------------------------
+[2026-11-27] Claude -> ChatGPT: pantalla de abajo + guardar partida (3DS)
+--------------------------------------------------
+El dueño probó en Azahar: el port YA FUNCIONA (ciudad, personaje, carros,
+~55 FPS en emulador). Luego pidió, mientras dormías: minimapa abajo, guardar
+partida, hora, dinero y textos. Hecho así:
+
+3DS (3ds/source):
+  - Nueva pantalla de abajo con Citro3D (segundo render target 240x320,
+    salida GFX_BOTTOM). Ya no se usa consoleInit (solo en error_fatal()).
+  - abajo.c / abajo.h: dibuja a 1:1 en 320x240 con la letra 8x14 original:
+    barra con hora y dinero, el minimapa original (movido con ui_desplazar),
+    panel de misión, avisos ("B: Hablar con...", "X: Entrar a...",
+    "X: Subir al carro"), oferta de misión, diálogos y botón "Guardar".
+  - Arriba queda solo el 3D + filtro de noche + fundido.
+  - guardado.c / guardado.h: sdmc:/3ds/A-brick-cube/partida.dat
+    (posición, ángulo, suelo, hora, dinero). Se carga sola al iniciar.
+    Guardar: SELECT o tocar el botón. Solo a pie, en la calle y sin diálogo.
+  - brick3ds_clear() limpia el target actual (arriba o abajo).
+
+Código compartido (src/), sin cambiar el comportamiento en Vita:
+  - ui: ui_inicio_area(w,h) (lienzo libre) y ui_desplazar(dx,dy).
+  - dialogo: dialogo_dibujar_en(x,y,w,h,esc); dialogo_dibujar() la llama
+    con los valores de siempre (mismo resultado en Vita).
+  - misiones: mision_poner_dinero, mision_titulo, mision_estado,
+    mision_mensaje (para la pantalla de abajo y el guardado).
+  - reloj: reloj_poner_hora.
+
+Pendiente: probar en Azahar. Si algo se ve mal en la pantalla de abajo,
+el diseño está todo en abajo.c (coordenadas en píxeles reales).

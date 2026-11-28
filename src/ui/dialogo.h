@@ -8,5 +8,7 @@ int  dialogo_activo(void);
 // Llamar cada cuadro. avanzar = 1 en el cuadro en que se aprieta el botón. Devuelve 1 cuando el diálogo se acaba de cerrar.
 int  dialogo_actualizar(int avanzar);
 void dialogo_dibujar(void);       // dentro de ui_inicio / ui_fin
+// Igual, en un cuadro (x, y, w, h) con letra de tamaño esc (pantalla de abajo de 3DS)
+void dialogo_dibujar_en(float x, float y, float w, float h, int esc);
 
 #endif
