@@ -21,7 +21,8 @@ void ui_inicio(void) {
     nv = 0;
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glLoadIdentity();
-    glOrtho(0.0f, 960.0f, 544.0f, 0.0f, -1.0f, 1.0f);
+    /* 960x544 centrado en 400x240, conservando la proporción de los elementos. */
+    glOrtho(0.0f, 960.0f, 560.0f, -16.0f, -1.0f, 1.0f);
     glMatrixMode(GL_MODELVIEW); glLoadIdentity();
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_COLOR_ARRAY);
