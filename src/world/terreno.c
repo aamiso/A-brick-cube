@@ -34,11 +34,15 @@ static void rect(Malla *m, float x0, float z0, float x1, float z1, float r, floa
     malla_tapa(m, (x0 + x1) * 0.5f, g_y, (z0 + z1) * 0.5f, x1 - x0, z1 - z0, r, g, b);
 }
 
-static void celda_base(Malla *m, int c, int f) {
+// Color y altura de la baldosa de una celda
+static void celda_color(int c, int f, float *y, float *rr, float *gg, float *bb) {
     char t = ciudad_tipo_en(c, f);
-    g_y = (t == '=' || t == 'S' || t == 'W') ? 0.06f : -0.015f;
-    float x0 = ciudad_centro_x(c) - 0.5f, z0 = ciudad_centro_z(f) - 0.5f;
+    *y = (t == '=' || t == 'S' || t == 'W') ? 0.06f : -0.015f;
+#ifdef __3DS__
+    int par = 0;      // 3DS: sin cuadriculado, así las baldosas iguales se juntan (muchos menos vértices)
+#else
     int par = (c + f) & 1;
+#endif
     unsigned q = azar(c, f);
     float r, g, b;
     if (t == '=') {
@@ -54,8 +58,37 @@ static void celda_base(Malla *m, int c, int f) {
         r = par ? 0.42f : 0.38f; g = par ? 0.76f : 0.71f; b = par ? 0.30f : 0.27f;
         if (q % 13 == 0) { r += 0.05f; g += 0.05f; b += 0.04f; }
     }
+    *rr = r; *gg = g; *bb = b;
+}
+
+static void celda_base(Malla *m, int c, int f) {
+    float r, g, b;
+    celda_color(c, f, &g_y, &r, &g, &b);
+    float x0 = ciudad_centro_x(c) - 0.5f, z0 = ciudad_centro_z(f) - 0.5f;
     rect(m, x0, z0, x0 + 1.0f, z0 + 1.0f, r, g, b);
 }
+
+#ifdef __3DS__
+// Una fila de baldosas: las celdas seguidas con el mismo color y altura van en UN rectángulo
+static void fila_base(Malla *m, int f, int c0, int c1) {
+    int c = c0;
+    while (c < c1) {
+        float y, r, g, b;
+        celda_color(c, f, &y, &r, &g, &b);
+        int c2 = c + 1;
+        while (c2 < c1) {
+            float y2, r2, g2, b2;
+            celda_color(c2, f, &y2, &r2, &g2, &b2);
+            if (y2 != y || r2 != r || g2 != g || b2 != b) break;
+            c2++;
+        }
+        g_y = y;
+        float x0 = ciudad_centro_x(c) - 0.5f, z0 = ciudad_centro_z(f) - 0.5f;
+        rect(m, x0, z0, x0 + (float)(c2 - c), z0 + 1.0f, r, g, b);
+        c = c2;
+    }
+}
+#endif
 
 // Rayas, bordillos y cebras (van encima de la base)
 static void celda_detalle(Malla *m, int c, int f) {
@@ -118,7 +151,11 @@ static void armar_pedazo(int pc, int pf) {
     int c1 = c0 + CH, f1 = f0 + CH;
     if (c1 > ciudad_ancho()) c1 = ciudad_ancho();
     if (f1 > ciudad_alto())  f1 = ciudad_alto();
+#ifdef __3DS__
+    for (int f = f0; f < f1; f++) fila_base(m, f, c0, c1);
+#else
     for (int f = f0; f < f1; f++) for (int c = c0; c < c1; c++) celda_base(m, c, f);
+#endif
     for (int f = f0; f < f1; f++) for (int c = c0; c < c1; c++) celda_detalle(m, c, f);
     malla_subir(m);
     armado[pf][pc] = 1;
@@ -129,6 +166,21 @@ void terreno_reiniciar(void) {
         for (int c = 0; c < MAX_CH; c++)
             if (armado[f][c]) { malla_liberar(&pedazos[f][c]); armado[f][c] = 0; }
 }
+
+
+#ifdef __3DS__
+// ¿Cae este pedazo (centro cx,cz y radio) dentro de lo que ve la cámara?
+// La cámara está unas unidades detrás del jugador y ve ~88° a lo ancho; se deja margen.
+static int en_vista(float cx, float cz, float px, float pz, float fx, float fz, float radio) {
+    float ax = px - fx * 10.0f, az = pz - fz * 10.0f;
+    float dx = cx - ax, dz = cz - az, d = sqrtf(dx * dx + dz * dz);
+    if (d <= radio + 1.0f) return 1;
+    float c = (dx * fx + dz * fz) / d;
+    if (c > 1.0f) c = 1.0f; if (c < -1.0f) c = -1.0f;
+    float s = radio / d; if (s > 1.0f) s = 1.0f;
+    return acosf(c) <= 0.85f + asinf(s);     // 0.85 rad ≈ 49°: mitad del ancho de la vista + margen
+}
+#endif
 
 void terreno_dibujar(float px, float pz, float giro) {
     float rad = giro * 3.14159265f / 180.0f, fx = sinf(rad), fz = -cosf(rad);
@@ -148,6 +200,9 @@ void terreno_dibujar(float px, float pz, float giro) {
             if (d > RADIO_ARMA) continue;
             // detrás de la cámara no hay nada que ver
             if ((cx - px) * fx + (cz - pz) * fz < -CH * 1.5f - 12.0f) continue;
+#ifdef __3DS__
+            if (!en_vista(cx, cz, px, pz, fx, fz, CH * 0.7072f + 1.0f)) continue;
+#endif
             if (!armado[pf][pc]) {
                 if (arma_este_cuadro <= 0) continue;
                 arma_este_cuadro--;

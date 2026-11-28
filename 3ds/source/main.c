@@ -113,6 +113,7 @@ static int error_fatal(const char *msg) {
 }
 
 int main(void) {
+    osSetSpeedupEnable(true);   // New 3DS: CPU a 804 MHz (en Old 3DS no hace nada)
     gfxInitDefault();
     if(R_FAILED(romfsInit())) { error_fatal("No se pudo montar ROMFS."); gfxExit(); return 1; }
     if(!brick_renderer_init()) { error_fatal("No se pudo iniciar Citro3D/shader."); romfsExit(); gfxExit(); return 1; }

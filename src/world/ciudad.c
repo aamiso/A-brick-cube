@@ -78,7 +78,16 @@ static int bakes_restantes = 0;
 // guardada en la memoria de video (así se dibuja con una sola llamada).
 #define GCH   16
 #define MAX_G 26
+#ifdef __3DS__
+typedef struct { Malla m, lejos; char listo; } Grupo;   // lejos: igual pero con árboles sencillos
+#define GRUPO_LIBERAR(g) do { malla_liberar(&(g)->m); malla_liberar(&(g)->lejos); (g)->listo = 0; } while (0)
+#ifndef CERCA_DETALLE
+#define CERCA_DETALLE 5.0f    // los grupos a menos de esto usan los árboles detallados
+#endif
+#else
 typedef struct { Malla m; char listo; } Grupo;
+#define GRUPO_LIBERAR(g) do { malla_liberar(&(g)->m); (g)->listo = 0; } while (0)
+#endif
 static Grupo grupos[MAX_G][MAX_G];
 static Malla lejano;            // calles, aceras y agua de todo el mapa (una sola malla)
 static int lejano_listo = 0;
@@ -132,7 +141,7 @@ static unsigned azar2(int a, int b) {
 static void liberar_mallas(void) {
     for (int f = 0; f < MAX_G; f++)
         for (int c = 0; c < MAX_G; c++)
-            if (grupos[f][c].listo) { malla_liberar(&grupos[f][c].m); grupos[f][c].listo = 0; }
+            if (grupos[f][c].listo) GRUPO_LIBERAR(&grupos[f][c]);
     if (lejano_listo) { malla_liberar(&lejano); lejano_listo = 0; }
 }
 
@@ -274,6 +283,43 @@ static void cargar_emergencia(void) {
 static Malla arbol_malla[N_ARBOLES];
 static int arboles_listos = 0;
 
+#ifdef __3DS__
+// 3DS: versión sencilla de cada árbol para verlo de lejos (tronco + copa: ~66 vértices
+// en vez de ~300). Se calcula sola a partir del árbol de cubitos.
+static Malla arbol_simple[N_ARBOLES];
+static void arbol_simple_hacer(int n, const Voxeles *v) {
+    int lx0 = 99, lx1 = -1, ly0 = 99, ly1 = -1, lz0 = 99, lz1 = -1;   // copa
+    int tx0 = 99, tx1 = -1, tz0 = 99, tz1 = -1;                         // tronco
+    float sr = 0, sg = 0, sb = 0; int cnt = 0;
+    for (int y = 0; y < v->H; y++) for (int z = 0; z < v->D; z++) for (int x = 0; x < v->W; x++) {
+        unsigned char l = v->v[((size_t)y * v->D + z) * v->W + x];
+        if (!l) continue;
+        if (l == 't' || l == 'T') {
+            if (x < tx0) tx0 = x; if (x > tx1) tx1 = x; if (z < tz0) tz0 = z; if (z > tz1) tz1 = z;
+            continue;
+        }
+        if (x < lx0) lx0 = x; if (x > lx1) lx1 = x; if (y < ly0) ly0 = y; if (y > ly1) ly1 = y;
+        if (z < lz0) lz0 = z; if (z > lz1) lz1 = z;
+        unsigned rgb = v->hay[l] ? v->pal[l] : 0x3f9a3a;
+        sr += ((rgb >> 16) & 255) / 255.0f; sg += ((rgb >> 8) & 255) / 255.0f; sb += (rgb & 255) / 255.0f; cnt++;
+    }
+    malla_iniciar(&arbol_simple[n]);
+    const float L = 0.25f, O = 6.5f;   // mismo tamaño y centro que voxel_malla(&v, 0.25f, 6.5f, ...)
+    if (cnt == 0) return;
+    float r = sr / cnt, g = sg / cnt, b = sb / cnt;
+    if (tx1 >= 0 && ly0 > 0) {
+        float x0 = (tx0 - O) * L, x1 = (tx1 + 1 - O) * L, z0 = (tz0 - O) * L, z1 = (tz1 + 1 - O) * L, h = ly0 * L;
+        malla_caja(&arbol_simple[n], (x0 + x1) * 0.5f, h * 0.5f, (z0 + z1) * 0.5f, x1 - x0, h, z1 - z0, 0.42f, 0.29f, 0.18f);
+    }
+    // la copa un poco más chica que su caja: los bordes del árbol de cubitos son irregulares
+    float x0 = (lx0 - O) * L, x1 = (lx1 + 1 - O) * L, z0 = (lz0 - O) * L, z1 = (lz1 + 1 - O) * L;
+    float y0 = ly0 * L, y1 = (ly1 + 1) * L;
+    float w = (x1 - x0) * 0.88f, d = (z1 - z0) * 0.88f, h = y1 - y0;
+    malla_caja(&arbol_simple[n], (x0 + x1) * 0.5f, (y0 + y1) * 0.5f, (z0 + z1) * 0.5f, w, h, d, r, g, b);
+    malla_tapa(&arbol_simple[n], (x0 + x1) * 0.5f, y0, (z0 + z1) * 0.5f, w, d, r * 0.6f, g * 0.6f, b * 0.6f);   // por debajo
+}
+#endif
+
 static void arbol_hacer(int n, void (*forma)(Voxeles *)) {
     Voxeles v;
     voxel_crear(&v, 13, 13, 18);
@@ -295,6 +341,9 @@ static void arbol_hacer(int n, void (*forma)(Voxeles *)) {
         }
     malla_iniciar(&arbol_malla[n]);
     voxel_malla(&v, 0.25f, 6.5f, 0.0f, 6.5f, &arbol_malla[n]);
+#ifdef __3DS__
+    arbol_simple_hacer(n, &v);
+#endif
     voxel_liberar(&v);
 }
 // 0: copa de cubos grandes (árbol de bloques)
@@ -532,6 +581,9 @@ static void armar_fachada(Malla *m, const Bloque *b, const TipoEdificio *e) {
 static void armar_grupo(int gc, int gf) {
     Grupo *g = &grupos[gf][gc];
     malla_iniciar(&g->m);
+#ifdef __3DS__
+    malla_iniciar(&g->lejos);
+#endif
     for (int i = 0; i < n_bloques; i++) {
         const Bloque *b = &bloques[i];
         const TipoEdificio *e = edificio_de(b->tipo);
@@ -540,6 +592,9 @@ static void armar_grupo(int gc, int gf) {
         int f = (int)floorf(b->z / CIUDAD_TAM + alto * 0.5f) / GCH;
         if (c != gc || f != gf) continue;
         armar_fachada(&g->m, b, e);
+#ifdef __3DS__
+        armar_fachada(&g->lejos, b, e);
+#endif
     }
     for (int i = 0; i < n_arboles; i++) {
         float x = arboles[i][0], z = arboles[i][1];
@@ -549,8 +604,14 @@ static void armar_grupo(int gc, int gf) {
         unsigned q = azar2((int)(x * 4), (int)(z * 4));
         float esc = 0.9f + (q % 5) * 0.05f;
         malla_agregar(&g->m, &arbol_malla[(q >> 6) % N_ARBOLES], x, 0.0f, z, esc, (float)((q >> 3) % 4) * 90.0f);
+#ifdef __3DS__
+        malla_agregar(&g->lejos, &arbol_simple[(q >> 6) % N_ARBOLES], x, 0.0f, z, esc, (float)((q >> 3) % 4) * 90.0f);
+#endif
     }
     malla_subir(&g->m);
+#ifdef __3DS__
+    malla_subir(&g->lejos);
+#endif
     g->listo = 1;
 }
 
@@ -572,6 +633,21 @@ void ciudad_precalentar(float px, float pz) {
         }
 }
 
+
+#ifdef __3DS__
+// ¿Cae este pedazo (centro cx,cz y radio) dentro de lo que ve la cámara?
+// La cámara está unas unidades detrás del jugador y ve ~88° a lo ancho; se deja margen.
+static int en_vista(float cx, float cz, float px, float pz, float fx, float fz, float radio) {
+    float ax = px - fx * 10.0f, az = pz - fz * 10.0f;
+    float dx = cx - ax, dz = cz - az, d = sqrtf(dx * dx + dz * dz);
+    if (d <= radio + 1.0f) return 1;
+    float c = (dx * fx + dz * fz) / d;
+    if (c > 1.0f) c = 1.0f; if (c < -1.0f) c = -1.0f;
+    float s = radio / d; if (s > 1.0f) s = 1.0f;
+    return acosf(c) <= 0.85f + asinf(s);     // 0.85 rad ≈ 49°: mitad del ancho de la vista + margen
+}
+#endif
+
 void ciudad_dibujar(float px, float pz, float giro) {
     bakes_restantes = BAKES_POR_CUADRO;
     float rad = giro * 3.14159265f / 180.0f, fx = sinf(rad), fz = -cosf(rad);
@@ -583,16 +659,23 @@ void ciudad_dibujar(float px, float pz, float giro) {
             Grupo *g = &grupos[gf][gc];
             float cx, cz; centro_grupo(gc, gf, &cx, &cz);
             float d = fmaxf(fabsf(cx - px), fabsf(cz - pz)) - GCH * 0.5f;
-            if (d > RADIO_BORRA) { if (g->listo) { malla_liberar(&g->m); g->listo = 0; } continue; }
+            if (d > RADIO_BORRA) { if (g->listo) GRUPO_LIBERAR(g); continue; }
             if (d > RADIO_GRANDE) continue;
             // detrás de la cámara no hay nada que ver
             if ((cx - px) * fx + (cz - pz) * fz < -GCH * 0.8f - 16.0f) continue;
+#ifdef __3DS__
+            if (!en_vista(cx, cz, px, pz, fx, fz, GCH * CIUDAD_TAM * 0.7072f + 3.0f)) continue;
+#endif
             if (!g->listo) {
                 if (bakes_restantes <= 0) continue;
                 bakes_restantes--;
                 armar_grupo(gc, gf);
             }
+#ifdef __3DS__
+            malla_dibujar(d < CERCA_DETALLE ? &g->m : &g->lejos);
+#else
             malla_dibujar(&g->m);
+#endif
         }
     }
     lugares_dibujar(px, pz);
@@ -610,7 +693,7 @@ int ciudad_destruir(float x, float y, float z, float r, unsigned *color) {
         *color = rgb_de(e->r, e->g, e->b);
         int c = (int)floorf(b->x / CIUDAD_TAM + ancho * 0.5f) / GCH;
         int f = (int)floorf(b->z / CIUDAD_TAM + alto * 0.5f) / GCH;
-        if (grupos[f][c].listo) { malla_liberar(&grupos[f][c].m); grupos[f][c].listo = 0; }
+        if (grupos[f][c].listo) GRUPO_LIBERAR(&grupos[f][c]);
         return 1;
     }
     return 0;

@@ -25,18 +25,26 @@ void minimapa_dibujar(float px, float pz, float ang, int hay_marca, float mx, fl
     float x0 = 960 - LADO - 14, y0 = 14;
     ui_rect(x0 - 3, y0 - 3, LADO + 6, LADO + 6, 0x000000C8);
     int cc = (int)floorf(px / CIUDAD_TAM + ciudad_ancho() * 0.5f), cf = (int)floorf(pz / CIUDAD_TAM + ciudad_alto() * 0.5f);
-    for (int f = -R; f < R; f++) {
-        int c = -R;
-        while (c < R) {                                   // junta celdas iguales en una sola barra
-            char t = ciudad_tipo_en(cc + c, cf + f);
-            if (t == 0) t = 'T';
-            unsigned col = color_de(t);
-            int c2 = c + 1;
-            while (c2 < R) { char u = ciudad_tipo_en(cc + c2, cf + f); if (u == 0) u = 'T'; if (color_de(u) != col) break; c2++; }
-            ui_rect(x0 + (c + R) * ESC, y0 + (f + R) * ESC, (c2 - c) * ESC, ESC, col);
-            c = c2;
+    // Las barras solo se recalculan cuando el jugador cambia de celda (antes: ~5800 consultas por cuadro)
+    static struct { short c, f, n; unsigned col; } barras[2 * R * 2 * R];
+    static int nb = 0, ult_cc = -99999, ult_cf = -99999;
+    if (cc != ult_cc || cf != ult_cf) {
+        ult_cc = cc; ult_cf = cf; nb = 0;
+        for (int f = -R; f < R; f++) {
+            int c = -R;
+            while (c < R) {                               // junta celdas iguales en una sola barra
+                char t = ciudad_tipo_en(cc + c, cf + f);
+                if (t == 0) t = 'T';
+                unsigned col = color_de(t);
+                int c2 = c + 1;
+                while (c2 < R) { char u = ciudad_tipo_en(cc + c2, cf + f); if (u == 0) u = 'T'; if (color_de(u) != col) break; c2++; }
+                barras[nb].c = (short)c; barras[nb].f = (short)f; barras[nb].n = (short)(c2 - c); barras[nb].col = col; nb++;
+                c = c2;
+            }
         }
     }
+    for (int i = 0; i < nb; i++)
+        ui_rect(x0 + (barras[i].c + R) * ESC, y0 + (barras[i].f + R) * ESC, barras[i].n * ESC, ESC, barras[i].col);
     for (int i = 0; i < vehiculos_cantidad(); i++) {      // carros: puntitos rojos
         float vx, vz, a, v; vehiculo_pos(i, &vx, &vz, &a, &v);
         float dx = (vx - px) / CIUDAD_TAM * ESC, dz = (vz - pz) / CIUDAD_TAM * ESC;
