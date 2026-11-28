@@ -145,7 +145,11 @@ void vehiculos_iniciar(float cx, float cz) {
 void vehiculos_dibujar(float px, float pz) {
     for (int i = 0; i < n_carros; i++) {
         const Carro *k = &carros[i];
+#ifdef __3DS__
+        if (fabsf(k->x - px) > 68.0f || fabsf(k->z - pz) > 68.0f) continue;
+#else
         if (fabsf(k->x - px) > 90.0f || fabsf(k->z - pz) > 90.0f) continue;
+#endif
         glPushMatrix();
         glTranslatef(k->x, 0.0f, k->z);
         glTranslatef(0.0f, k->alt, 0.0f);                // en el aire cuando sale volando
