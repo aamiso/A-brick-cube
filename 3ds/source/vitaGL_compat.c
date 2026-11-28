@@ -19,11 +19,11 @@ extern void brick3ds_set_mvp(const C3D_Mtx *m);
 #define STACK_MAX 32
 #define BUFFER_MAX 4096
 #define RING_BYTES (3u * 1024u * 1024u)
-#define PENDING_MAX 1024
+#define RING_MAX_BYTES (12u * 1024u * 1024u)
 
 typedef struct { float m[16]; } Mat4;            /* columna mayor, como OpenGL */
 typedef struct { void *data; size_t size; int used; int linear; } Buffer;
-typedef struct { void *data; int linear; } Pending;
+typedef struct Pending { void *data; int linear; struct Pending *next; } Pending;
 
 static Mat4 projection, modelview, *current = &modelview;
 static Mat4 stack[STACK_MAX];
@@ -40,8 +40,8 @@ static float current_color[4] = {1, 1, 1, 1};
 
 static unsigned char *ring;
 static size_t ring_used;
-static Pending pending[PENDING_MAX];
-static int pending_n;
+static Pending *pending_head;
+static unsigned pending_leaks;
 
 /* ---------- matrices ---------- */
 static void identity(Mat4 *m){memset(m,0,sizeof(*m));m->m[0]=m->m[5]=m->m[10]=m->m[15]=1.0f;}
@@ -141,8 +141,9 @@ void glBindBuffer(unsigned int target,unsigned int id){if(target==GL_ARRAY_BUFFE
    al inicio del siguiente cuadro. */
 static void release_later(void *data,int linear){
     if(!data)return;
-    if(pending_n<PENDING_MAX){pending[pending_n].data=data;pending[pending_n].linear=linear;pending_n++;}
-    else { if(linear)linearFree(data); else free(data); }
+    Pending *p=(Pending*)malloc(sizeof(Pending));
+    if(!p){ pending_leaks++; return; } /* Ante duda, filtrar memoria es más seguro que liberar mientras la GPU la usa. */
+    p->data=data;p->linear=linear;p->next=pending_head;pending_head=p;
 }
 void glBufferData(unsigned int target,long size,const void *data,unsigned int usage){
     (void)usage;
@@ -169,10 +170,25 @@ void glDeleteBuffers(int n,const unsigned int *ids){
 }
 
 /* ---------- buffer temporal por cuadro (memoria lineal) ---------- */
+static size_t ring_capacity;
 static void *ring_copy(const unsigned char *src,int stride,int elem,int count){
+    if(!src||stride<=0||elem<=0||count<=0)return NULL;
     size_t need=(size_t)elem*(size_t)count;
     size_t start=(ring_used+15u)&~(size_t)15u;
-    if(!ring||start+need>RING_BYTES)return NULL;
+    if(need>RING_MAX_BYTES||start>RING_MAX_BYTES-need)return NULL;
+    if(!ring||start+need>ring_capacity){
+        size_t wanted=start+need, capacity=ring_capacity?ring_capacity:RING_BYTES;
+        while(capacity<wanted&&capacity<RING_MAX_BYTES)capacity*=2;
+        if(capacity>RING_MAX_BYTES)capacity=RING_MAX_BYTES;
+        unsigned char *larger=(unsigned char*)linearAlloc(capacity);
+        if(!larger)return NULL;
+        if(ring&&ring_used){
+            GSPGPU_FlushDataCache(ring,(u32)ring_used);
+            memcpy(larger,ring,ring_used);
+            release_later(ring,1);
+        }
+        ring=larger;ring_capacity=capacity;
+    }
     unsigned char *dst=ring+start;
     if(stride==elem)memcpy(dst,src,need);
     else for(int i=0;i<count;i++)memcpy(dst+(size_t)i*elem,src+(size_t)i*stride,(size_t)elem);
@@ -182,12 +198,14 @@ static void *ring_copy(const unsigned char *src,int stride,int elem,int count){
 
 void brick3ds_compat_init(void){
     ring=(unsigned char*)linearAlloc(RING_BYTES);
+    ring_capacity=ring?RING_BYTES:0;
     identity(&projection);identity(&modelview);
 }
 void brick3ds_compat_frame_begin(void){
     /* C3D_FRAME_SYNCDRAW ya esperó a que la GPU terminara el cuadro anterior. */
-    for(int i=0;i<pending_n;i++){if(pending[i].linear)linearFree(pending[i].data);else free(pending[i].data);}
-    pending_n=0;
+    Pending *p=pending_head;
+    while(p){Pending *next=p->next;if(p->linear)linearFree(p->data);else free(p->data);free(p);p=next;}
+    pending_head=NULL;
     ring_used=0;
 }
 void brick3ds_flush(void){
@@ -196,7 +214,7 @@ void brick3ds_flush(void){
 void brick3ds_compat_exit(void){
     brick3ds_compat_frame_begin();
     for(int i=1;i<BUFFER_MAX;i++)if(buffers[i].data){if(buffers[i].linear)linearFree(buffers[i].data);else free(buffers[i].data);buffers[i].data=NULL;}
-    if(ring){linearFree(ring);ring=NULL;}
+    if(ring){linearFree(ring);ring=NULL;ring_capacity=0;}
 }
 
 /* ---------- dibujo ---------- */
@@ -217,7 +235,7 @@ void glDrawArrays(unsigned int mode,int first,int count){
         vbuf=ring_copy(vertex_ptr+(size_t)first*vs,vs,vel,count);
         if(use_color){cbuf=ring_copy(color_ptr+(size_t)first*cs,cs,color_size,count);vs=vel;cs=color_size;}
         else vs=vel;
-        if(!vbuf||(use_color&&!cbuf))return;   /* buffer del cuadro lleno: se omite */
+        if(!vbuf||(use_color&&!cbuf))return;   /* reserva fallida: no enviar punteros inválidos a la GPU */
         draw_first=0;
     }
 
