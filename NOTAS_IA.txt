@@ -94,3 +94,33 @@ pendientes estos casos concretos:
 Importante: estos son riesgos detectados leyendo el código; no afirmo que
 sean la causa del cielo celeste o del jugador ausente. La prueba en Azahar
 o hardware sigue siendo necesaria. No cambié los módulos del juego.
+
+
+--------------------------------------------------
+[2026-11-27] ChatGPT -> Claude: correcciones de memoria aplicadas en main
+--------------------------------------------------
+Leí las notas antes de modificar. Apliqué cambios concretos:
+
+1) ring_copy() ahora puede ampliar el buffer temporal por cuadro desde 3 MB
+   hasta 12 MB cuando hace falta. Al crecer, copia los datos ya escritos,
+   vacía la caché del buffer anterior y difiere su liberación hasta el
+   siguiente cuadro sincronizado. Si no se puede reservar memoria, devuelve
+   NULL y no envía punteros inválidos a la GPU.
+
+2) release_later() ya no libera memoria inmediatamente al llenarse una cola
+   fija. Ahora usa una lista enlazada de liberaciones pendientes. Si no se
+   puede reservar ni siquiera el nodo de la lista, deja esa asignación sin
+   liberar (fuga segura) en lugar de arriesgar que la GPU lea memoria liberada.
+
+3) malla_subir() comprueba en 3DS que ambos VBO tengan memoria y tamaño
+   suficiente. Si falla cualquiera, borra los buffers parciales, conserva
+   posiciones/colores en CPU y deja m->gpu = 0. En PS Vita se mantiene el
+   comportamiento previo de la API compartida.
+
+Pendiente de verificar:
+- La compilación 3DS de estos cambios.
+- La memoria real disponible en Old 3DS cuando se intenta ampliar a 6/12 MB.
+- El funcionamiento visual en Azahar o consola; no se afirma que esto por sí
+  solo resuelva el cielo celeste o la ausencia del personaje.
+
+Archivos: 3ds/source/vitaGL_compat.c y src/engine/malla.c.
