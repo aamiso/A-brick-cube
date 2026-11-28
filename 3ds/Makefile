@@ -46,7 +46,7 @@ export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
                    -I$(CURDIR)/$(BUILD)
 export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-export _3DSXFLAGS += --romfs=$(CURDIR)/$(ROMFS)
+export _3DSXFLAGS := --romfs=$(TOPDIR)/../data
 
 .PHONY: $(BUILD) clean all
 
