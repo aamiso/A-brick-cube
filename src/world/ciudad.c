@@ -34,9 +34,15 @@
 #define MAX_BLOQUES 40000
 #define MAX_ARBOLES 20000
 
-#define RADIO_GRANDE  64.0f   // hasta dónde se dibujan edificios y calles lejanas
-#define RADIO_BORRA   120.0f  // los grupos más lejos que esto se borran de la memoria
-#define BAKES_POR_CUADRO 1    // cuántos grupos nuevos se arman por cuadro (para no trabarse)
+#ifdef __3DS__
+#define RADIO_GRANDE  40.0f
+#define RADIO_BORRA   72.0f
+#define BAKES_POR_CUADRO 2
+#else
+#define RADIO_GRANDE  64.0f
+#define RADIO_BORRA   120.0f
+#define BAKES_POR_CUADRO 1
+#endif
 
 typedef struct { char letra; float h; float r, g, b; } TipoEdificio;
 
