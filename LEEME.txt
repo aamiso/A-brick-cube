@@ -75,3 +75,7 @@ v0.84: Interiores en los 15 lugares, con varios cuartos unidos por puertas (51 c
 v0.85: Arreglado: carros que se quedaban pegados tras chocar (ahora se separan solos) y ahora siempre se puede bajar del carro.
 
 v0.86: caratulas (icono, fondo y pantalla de inicio del LiveArea) en sce_sys/.
+
+
+--- 00.87 ---
+Port de Nintendo 3DS: pantalla inferior con minimapa, hora, dinero, misiones y avisos; guardado de partida; cámara trasera al caminar; controles separados para Circle Pad y cruceta; ajustes de rendimiento específicos para Old 3DS. La versión Vita conserva su comportamiento.
