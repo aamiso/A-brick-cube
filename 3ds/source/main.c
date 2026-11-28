@@ -126,7 +126,9 @@ int main(void) {
     }
     ciudad_precalentar(jugador.x, jugador.z);
     camara_iniciar(&camara);
-    camara.hombro = 1; // Usa el modo de hombro original (distancia objetivo 2.7), no una cámara recreada.
+    camara.hombro = 0;
+    camara.giro = 180.0f - jugador.angulo; // Cámara centrada detrás del personaje, como en Ocarina of Time 3D.
+    camara.alto = 8.0f;
     vehiculos_iniciar(jugador.x, jugador.z);
     npcs_iniciar(jugador.x, jugador.z);
     int en_carro = -1;
@@ -158,8 +160,8 @@ int main(void) {
         if(held&KEY_L)pad.buttons|=SCE_CTRL_LTRIGGER;
         pad.lx=(unsigned char)(128+(int)cp.dx*127/156);
         pad.ly=(unsigned char)(128-(int)cp.dy*127/156);
-        float rx=((held&KEY_RIGHT)?1.0f:0.0f)-((held&KEY_LEFT)?1.0f:0.0f);
-        float ry=((held&KEY_UP)?1.0f:0.0f)-((held&KEY_DOWN)?1.0f:0.0f);
+        float rx=((held&KEY_DRIGHT)?1.0f:0.0f)-((held&KEY_DLEFT)?1.0f:0.0f);
+        float ry=((held&KEY_DUP)?1.0f:0.0f)-((held&KEY_DDOWN)?1.0f:0.0f);
         brick3ds_frame_begin();
 
         // --- Actualizar ---
@@ -290,13 +292,15 @@ int main(void) {
                 }
             }
             fx = jugador.x; fz = jugador.z;
+            if (anim <= 0 && (fabsf(lx) + fabsf(ly) > 0.05f))
+                camara_seguir(&camara, 180.0f - jugador.angulo, 0.12f);
             camara.dist_meta = 6.5f;
         } else {
             float ang, vel, vx, vz;
             // R = acelerar, L = freno / reversa, stick (arriba/abajo) hace lo mismo, cuadrado = freno de mano
             float gas = (pad.buttons & SCE_CTRL_RTRIGGER) ? 1.0f : (ly < 0.0f ? -ly : 0.0f);
             float frn = (pad.buttons & SCE_CTRL_LTRIGGER) ? 1.0f : (ly > 0.0f ? ly : 0.0f);
-            vehiculo_manejar(en_carro, lx, gas, frn, (pad.buttons & SCE_CTRL_SQUARE) != 0);
+            vehiculo_manejar(en_carro, -lx, gas, frn, (pad.buttons & SCE_CTRL_SQUARE) != 0);
             vehiculo_pos(en_carro, &fx, &fz, &ang, &vel);
             vehiculo_velocidad(en_carro, &vx, &vz);
             // Cámara de persecución: va detrás del carro con un poco de retraso; el stick derecho mira alrededor

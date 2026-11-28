@@ -73,13 +73,19 @@ static float libre_hasta(float px, float py, float pz, float alto, float giro, f
     float dx = -cosf(a) * sinf(g), dy = sinf(a), dz = cosf(a) * cosf(g);
     float rx = cosf(g) * desvio, rz = sinf(g) * desvio;   // la cámara al hombro está corrida a un lado
     float ok = 0.0f, mal = -1.0f;
-    for (int k = 1; k <= 40; k++) {
-        float t = dist * k / 40.0f;
+    // Menos consultas de colisión por cuadro en 3DS; mantiene suficiente resolución para el seguimiento.
+#ifdef __3DS__
+    const int muestras = 28, refinamientos = 3;
+#else
+    const int muestras = 40, refinamientos = 4;
+#endif
+    for (int k = 1; k <= muestras; k++) {
+        float t = dist * k / (float)muestras;
         if (bloqueado(px + dx * t + rx, 1.0f + py + dy * t, pz + dz * t + rz, t >= 1.0f)) { mal = t; break; }
         ok = t;
     }
     if (mal < 0.0f) return dist;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < refinamientos; i++) {
         float t = (ok + mal) * 0.5f;
         if (bloqueado(px + dx * t + rx, 1.0f + py + dy * t, pz + dz * t + rz, t >= 1.0f)) mal = t; else ok = t;
     }

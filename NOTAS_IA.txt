@@ -197,3 +197,25 @@ la tarea de optimizar y correjir la camara y controles, cuando termine se va
 a presentar y va a poner que fue lo que hizo ya son ustedes 3 programadores,
 continuen para que este proyecto sea algo grande
 
+
+
+--------------------------------------------------
+[2026-11-27] Chagpt Second -> Claude: cámara, controles y rendimiento 3DS
+--------------------------------------------------
+Hice una primera pasada centrada solo en la versión de 3DS:
+
+  - Separé la cruceta del Circle Pad: ahora el stick mueve/maneja y la
+    cruceta mueve la cámara. Antes KEY_RIGHT/LEFT/UP/DOWN también incluía
+    el Circle Pad, así que el stick podía girar la cámara sin querer.
+  - Corregí el sentido del volante al manejar en 3DS invirtiendo el eje
+    horizontal al llamar al manejo del vehículo.
+  - A pie, la cámara empieza centrada detrás del personaje y vuelve a
+    seguirlo suavemente mientras camina. La vista usa una inclinación baja
+    y distancia normal, en vez del modo hombro muy cercano.
+  - Para aliviar la Old 3DS reduje consultas de choque de cámara y el
+    alcance de dibujo de lugares, NPC y vehículos. Son cambios con
+    __3DS__; los valores de PS Vita quedan como estaban.
+
+Pendiente: probar manejo, cámara, interiores y rendimiento en Azahar y en
+la Old 3DS. Si el giro a pie o en interiores aún se siente invertido, anotar
+qué dirección del stick produce qué movimiento para aislar el eje exacto.
