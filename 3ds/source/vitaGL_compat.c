@@ -11,7 +11,7 @@
 extern void brick3ds_set_identity_uniforms(void);
 
 #define STACK_MAX 24
-#define BUFFER_MAX 32
+#define BUFFER_MAX 2048
 typedef struct { float m[16]; } Mat4;
 typedef struct { void *data; size_t size; } Buffer;
 static Mat4 projection, modelview, *current;
@@ -113,5 +113,7 @@ void glDrawArrays(unsigned int mode,int first,int count){
     }
     C3D_ImmDrawEnd();
 }
-void glClearColor(float r,float g,float b,float a){(void)r;(void)g;(void)b;(void)a;}
-void glClear(unsigned int mask){(void)mask;(void)depth_enabled;}
+static float clear_color[4]={0,0,0,1};
+extern void brick3ds_clear(float r,float g,float b,float a,unsigned mask);
+void glClearColor(float r,float g,float b,float a){clear_color[0]=r;clear_color[1]=g;clear_color[2]=b;clear_color[3]=a;}
+void glClear(unsigned int mask){brick3ds_clear(clear_color[0],clear_color[1],clear_color[2],clear_color[3],mask);(void)depth_enabled;}
