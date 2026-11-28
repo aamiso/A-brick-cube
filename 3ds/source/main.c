@@ -24,29 +24,31 @@ typedef struct { unsigned buttons; unsigned char lx,ly; } SceCtrlData;
 static DVLB_s *brick_shader;
 static shaderProgram_s brick_program;
 static C3D_RenderTarget *brick_target;
-static int brick_u_projection, brick_u_modelview;
+static int brick_u_mvp;
+extern void brick3ds_compat_init(void);
+extern void brick3ds_compat_frame_begin(void);
+extern void brick3ds_compat_exit(void);
 static const u32 brick_transfer_flags =
  GX_TRANSFER_FLIP_VERT(0)|GX_TRANSFER_OUT_TILED(0)|GX_TRANSFER_RAW_COPY(0)|
  GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8)|GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8)|
  GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO);
-void brick3ds_set_identity_uniforms(void){C3D_Mtx m;Mtx_Identity(&m);C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,brick_u_projection,&m);C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,brick_u_modelview,&m);}
-void brick3ds_frame_begin(void){C3D_FrameBegin(C3D_FRAME_SYNCDRAW);C3D_FrameDrawOn(brick_target);}
+void brick3ds_set_mvp(const C3D_Mtx *m){C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,brick_u_mvp,m);}
+void brick3ds_frame_begin(void){C3D_FrameBegin(C3D_FRAME_SYNCDRAW);brick3ds_compat_frame_begin();C3D_FrameDrawOn(brick_target);}
 extern void brick3ds_flush(void);
 void brick3ds_present(void){brick3ds_flush();C3D_FrameEnd(0);}
 void brick3ds_clear(float r,float g,float b,float a,unsigned mask){u32 rgba=((u32)(u8)(r*255)<<24)|((u32)(u8)(g*255)<<16)|((u32)(u8)(b*255)<<8)|(u32)(u8)(a*255);u32 f=0;if(mask&GL_COLOR_BUFFER_BIT)f|=C3D_CLEAR_COLOR;if(mask&GL_DEPTH_BUFFER_BIT)f|=C3D_CLEAR_DEPTH;C3D_RenderTargetClear(brick_target,f,rgba,0);}
 static int brick_renderer_init(void){
- if(!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE))return 0;
+ if(!C3D_Init(0x100000))return 0;   /* 1 MB: la ciudad hace muchos dibujos por cuadro */
  brick_target=C3D_RenderTargetCreate(240,400,GPU_RB_RGBA8,GPU_RB_DEPTH24_STENCIL8);if(!brick_target)return 0;
  C3D_RenderTargetSetOutput(brick_target,GFX_TOP,GFX_LEFT,brick_transfer_flags);
   brick_shader=DVLB_ParseFile((u32*)vshader_shbin,vshader_shbin_size);if(!brick_shader)return 0;
  shaderProgramInit(&brick_program);shaderProgramSetVsh(&brick_program,&brick_shader->DVLE[0]);C3D_BindProgram(&brick_program);
- brick_u_projection=shaderInstanceGetUniformLocation(brick_program.vertexShader,"projection");
- brick_u_modelview=shaderInstanceGetUniformLocation(brick_program.vertexShader,"modelView");
- C3D_AttrInfo *a=C3D_GetAttrInfo();AttrInfo_Init(a);AttrInfo_AddLoader(a,0,GPU_FLOAT,4);AttrInfo_AddLoader(a,1,GPU_FLOAT,4);
+ brick_u_mvp=shaderInstanceGetUniformLocation(brick_program.vertexShader,"mvp");
+ brick3ds_compat_init();
  C3D_TexEnv *e=C3D_GetTexEnv(0);C3D_TexEnvInit(e);C3D_TexEnvSrc(e,C3D_Both,GPU_PRIMARY_COLOR,0,0);C3D_TexEnvFunc(e,C3D_Both,GPU_REPLACE);
  C3D_DepthMap(true,-1.0f,0.0f);C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);C3D_CullFace(GPU_CULL_NONE);return 1;
 }
-static void brick_renderer_exit(void){if(brick_target)C3D_RenderTargetDelete(brick_target);shaderProgramFree(&brick_program);if(brick_shader)DVLB_Free(brick_shader);C3D_Fini();}
+static void brick_renderer_exit(void){brick3ds_compat_exit();if(brick_target)C3D_RenderTargetDelete(brick_target);shaderProgramFree(&brick_program);if(brick_shader)DVLB_Free(brick_shader);C3D_Fini();}
 
 #include "core/entrada.h"
 #include "engine/cubo.h"

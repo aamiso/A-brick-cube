@@ -6,54 +6,57 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Adaptador de la API fija usada por el juego Vita. Las matrices se calculan
-   en CPU y los vértices ya transformados se envían al shader PICA de 3DS. */
-extern void brick3ds_set_identity_uniforms(void);
+/* Adaptador de la API fija (estilo vitaGL) usada por el juego a Citro3D.
+   - Las matrices se combinan en CPU (una sola MVP por dibujo) y la GPU de la
+     3DS transforma los vértices (antes se hacía vértice por vértice en CPU).
+   - La MVP incluye el giro de 90° de la pantalla superior de 3DS y el rango
+     de profundidad de PICA200 ([-1,0] en lugar del [-1,1] de OpenGL).
+   - Los buffers (glBufferData) viven en memoria lineal, que la GPU lee directo.
+   - Los datos que no están en memoria lineal se copian a un buffer por cuadro. */
 
-#define STACK_MAX 24
-#define BUFFER_MAX 2048
-typedef struct { float m[16]; } Mat4;
-typedef struct { void *data; size_t size; } Buffer;
-static Mat4 projection, modelview, *current;
+extern void brick3ds_set_mvp(const C3D_Mtx *m);
+
+#define STACK_MAX 32
+#define BUFFER_MAX 4096
+#define RING_BYTES (3u * 1024u * 1024u)
+#define PENDING_MAX 1024
+
+typedef struct { float m[16]; } Mat4;            /* columna mayor, como OpenGL */
+typedef struct { void *data; size_t size; int used; int linear; } Buffer;
+typedef struct { void *data; int linear; } Pending;
+
+static Mat4 projection, modelview, *current = &modelview;
 static Mat4 stack[STACK_MAX];
 static int stack_top;
 static Buffer buffers[BUFFER_MAX];
-static unsigned next_buffer=1, bound_buffer=0;
-static const float *vertex_ptr;
-static const unsigned char *color_ptr;
-static int vertex_size=3, color_size=4, vertex_stride=0, color_stride=0;
-static unsigned vertex_type=GL_FLOAT, color_type=GL_UNSIGNED_BYTE;
-static int vertex_enabled=0, color_enabled=0, depth_enabled=1;
-static float current_color[4]={1,1,1,1};
-static int batch_active=0, batch_vertices=0;
-#define BATCH_VERTEX_LIMIT 4095 /* múltiplo de 3: nunca corta un triángulo */
-static void flush_batch(void){if(batch_active){C3D_ImmDrawEnd();batch_active=0;batch_vertices=0;}}
+static unsigned next_hint = 1, bound_buffer = 0;
 
+static const unsigned char *vertex_ptr, *color_ptr;
+static int vertex_lin = 0, color_lin = 0;
+static int vertex_size = 3, color_size = 4, vertex_stride = 0, color_stride = 0;
+static unsigned vertex_type = GL_FLOAT, color_type = GL_UNSIGNED_BYTE;
+static int vertex_enabled = 0, color_enabled = 0;
+static float current_color[4] = {1, 1, 1, 1};
+
+static unsigned char *ring;
+static size_t ring_used;
+static Pending pending[PENDING_MAX];
+static int pending_n;
+
+/* ---------- matrices ---------- */
 static void identity(Mat4 *m){memset(m,0,sizeof(*m));m->m[0]=m->m[5]=m->m[10]=m->m[15]=1.0f;}
 static void multiply(Mat4 *out,const Mat4 *a,const Mat4 *b){
     Mat4 t;
     for(int c=0;c<4;c++)for(int r=0;r<4;r++){
-        t.m[c*4+r]=0;
-        for(int k=0;k<4;k++)t.m[c*4+r]+=a->m[k*4+r]*b->m[c*4+k];
+        float s=0;for(int k=0;k<4;k++)s+=a->m[k*4+r]*b->m[c*4+k];
+        t.m[c*4+r]=s;
     }
     *out=t;
 }
-static void apply(const Mat4 *m,float x,float y,float z,float w,float *o){
-    o[0]=m->m[0]*x+m->m[4]*y+m->m[8]*z+m->m[12]*w;
-    o[1]=m->m[1]*x+m->m[5]*y+m->m[9]*z+m->m[13]*w;
-    o[2]=m->m[2]*x+m->m[6]*y+m->m[10]*z+m->m[14]*w;
-    o[3]=m->m[3]*x+m->m[7]*y+m->m[11]*z+m->m[15]*w;
-}
 static void multiply_current(const Mat4 *rhs){Mat4 t;multiply(&t,current,rhs);*current=t;}
-static const void *resolve_pointer(const void *p){
-    if(!bound_buffer)return p;
-    uintptr_t off=(uintptr_t)p;
-    Buffer *b=&buffers[bound_buffer%BUFFER_MAX];
-    if(!b->data || off>=b->size)return NULL;
-    return (const unsigned char*)b->data+off;
-}
+
 void glMatrixMode(unsigned int mode){current=(mode==GL_PROJECTION)?&projection:&modelview;}
-void glLoadIdentity(void){if(!current){current=&modelview;}identity(current);}
+void glLoadIdentity(void){identity(current);}
 void glPushMatrix(void){if(stack_top<STACK_MAX)stack[stack_top++]=*current;}
 void glPopMatrix(void){if(stack_top>0)*current=stack[--stack_top];}
 void glTranslatef(float x,float y,float z){Mat4 t;identity(&t);t.m[12]=x;t.m[13]=y;t.m[14]=z;multiply_current(&t);}
@@ -79,45 +82,164 @@ void glOrtho(double l,double r,double b,double t,double n,double f){
     m.m[0]=(float)(2/(r-l));m.m[5]=(float)(2/(t-b));m.m[10]=(float)(-2/(f-n));
     m.m[12]=(float)(-(r+l)/(r-l));m.m[13]=(float)(-(t+b)/(t-b));m.m[14]=(float)(-(f+n)/(f-n));multiply_current(&m);
 }
+
+/* Corrección de 3DS aplicada después de la proyección:
+   x' = y, y' = -x   (la pantalla superior está girada 90°)
+   z' = (z - w) / 2  (OpenGL [-1,1] -> PICA [-1,0]; cerca = -1, lejos = 0) */
+static void upload_mvp(void){
+    Mat4 mvp,fix,out;
+    multiply(&mvp,&projection,&modelview);
+    memset(&fix,0,sizeof(fix));
+    fix.m[1*4+0]=1.0f;     /* fila 0 toma y */
+    fix.m[0*4+1]=-1.0f;    /* fila 1 toma -x */
+    fix.m[2*4+2]=0.5f; fix.m[3*4+2]=-0.5f;
+    fix.m[3*4+3]=1.0f;
+    multiply(&out,&fix,&mvp);
+    C3D_Mtx u;
+    for(int r=0;r<4;r++){
+        u.r[r].x=out.m[0*4+r]; u.r[r].y=out.m[1*4+r];
+        u.r[r].z=out.m[2*4+r]; u.r[r].w=out.m[3*4+r];
+    }
+    brick3ds_set_mvp(&u);
+}
+
+/* ---------- estado ---------- */
 void glViewport(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
-void glEnable(unsigned int cap){if(cap==GL_DEPTH_TEST){flush_batch();depth_enabled=1;C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);}}
-void glDisable(unsigned int cap){if(cap==GL_DEPTH_TEST){flush_batch();depth_enabled=0;C3D_DepthTest(false,GPU_ALWAYS,GPU_WRITE_ALL);}}
+void glEnable(unsigned int cap){if(cap==GL_DEPTH_TEST)C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);}
+void glDisable(unsigned int cap){if(cap==GL_DEPTH_TEST)C3D_DepthTest(false,GPU_ALWAYS,GPU_WRITE_COLOR);}
 void glEnableClientState(unsigned int cap){if(cap==GL_VERTEX_ARRAY)vertex_enabled=1;if(cap==GL_COLOR_ARRAY)color_enabled=1;}
 void glDisableClientState(unsigned int cap){if(cap==GL_VERTEX_ARRAY)vertex_enabled=0;if(cap==GL_COLOR_ARRAY)color_enabled=0;}
-void glVertexPointer(int size,unsigned int type,int stride,const void *ptr){vertex_size=size;vertex_type=type;vertex_stride=stride;vertex_ptr=(const float*)resolve_pointer(ptr);}
-void glColorPointer(int size,unsigned int type,int stride,const void *ptr){color_size=size;color_type=type;color_stride=stride;color_ptr=(const unsigned char*)resolve_pointer(ptr);}
 void glColor3f(float r,float g,float b){current_color[0]=r;current_color[1]=g;current_color[2]=b;current_color[3]=1;}
-void glGenBuffers(int n,unsigned int *ids){for(int i=0;i<n;i++){unsigned id=next_buffer++;if(id>=BUFFER_MAX)id=(id% (BUFFER_MAX-1))+1;ids[i]=id;}}
-void glBindBuffer(unsigned int target,unsigned int id){if(target==GL_ARRAY_BUFFER)bound_buffer=id;}
-void glBufferData(unsigned int target,long size,const void *data,unsigned int usage){
-    (void)usage;if(target!=GL_ARRAY_BUFFER||!bound_buffer||bound_buffer>=BUFFER_MAX||size<0)return;
-    Buffer *b=&buffers[bound_buffer];free(b->data);b->data=size?malloc((size_t)size):NULL;b->size=b->data?(size_t)size:0;if(b->data&&data)memcpy(b->data,data,(size_t)size);
+
+/* ---------- buffers ---------- */
+static const unsigned char *resolve_pointer(const void *p,int *is_linear){
+    *is_linear=0;
+    if(!bound_buffer)return (const unsigned char*)p;
+    uintptr_t off=(uintptr_t)p;
+    Buffer *b=&buffers[bound_buffer];
+    if(!b->used||!b->data||off>=b->size)return NULL;
+    *is_linear=b->linear;
+    return (const unsigned char*)b->data+off;
 }
-void glDeleteBuffers(int n,const unsigned int *ids){for(int i=0;i<n;i++){unsigned id=ids[i];if(id<BUFFER_MAX){free(buffers[id].data);buffers[id].data=NULL;buffers[id].size=0;}if(bound_buffer==id)bound_buffer=0;}}
-void glDrawArrays(unsigned int mode,int first,int count){
-    if(mode!=GL_TRIANGLES||!vertex_enabled||!vertex_ptr||count<=0)return;
-    Mat4 mv,mvp;mv=modelview;multiply(&mvp,&projection,&mv);
-    int vs=vertex_stride?vertex_stride:vertex_size*(int)sizeof(float);
-    int cs=color_stride?color_stride:(color_type==GL_UNSIGNED_BYTE?color_size:(int)(color_size*sizeof(float)));
-    for(int i=0;i<count;i++){
-        if(!batch_active){brick3ds_set_identity_uniforms();C3D_ImmDrawBegin(GPU_TRIANGLES);batch_active=1;batch_vertices=0;}
-        const unsigned char *vp=(const unsigned char*)vertex_ptr+(size_t)(first+i)*vs;
-        float x=((const float*)vp)[0],y=((const float*)vp)[1],z=vertex_size>2?((const float*)vp)[2]:0.0f;
-        float eye[4],clip[4];apply(&mv,x,y,z,1,eye);apply(&projection,eye[0],eye[1],eye[2],eye[3],clip);
-        float rr=current_color[0],gg=current_color[1],bb=current_color[2],aa=current_color[3];
-        if(color_enabled&&color_ptr){
-            const unsigned char *cp=color_ptr+(size_t)(first+i)*cs;
-            if(color_type==GL_UNSIGNED_BYTE){rr=cp[0]/255.0f;gg=cp[1]/255.0f;bb=cp[2]/255.0f;aa=color_size>3?cp[3]/255.0f:1.0f;}
-            else {const float *cf=(const float*)cp;rr=cf[0];gg=cf[1];bb=cf[2];aa=color_size>3?cf[3]:1.0f;}
+void glVertexPointer(int size,unsigned int type,int stride,const void *ptr){vertex_size=size;vertex_type=type;vertex_stride=stride;vertex_ptr=resolve_pointer(ptr,&vertex_lin);}
+void glColorPointer(int size,unsigned int type,int stride,const void *ptr){color_size=size;color_type=type;color_stride=stride;color_ptr=resolve_pointer(ptr,&color_lin);}
+
+/* IDs reutilizables: la ciudad crea y borra mallas al caminar, así que los IDs
+   nunca deben dar la vuelta y pisar un buffer que sigue vivo. */
+void glGenBuffers(int n,unsigned int *ids){
+    for(int i=0;i<n;i++){
+        ids[i]=0;
+        for(int k=0;k<BUFFER_MAX-1;k++){
+            unsigned id=1+((next_hint-1+k)%(BUFFER_MAX-1));
+            if(!buffers[id].used){buffers[id].used=1;buffers[id].data=NULL;buffers[id].size=0;ids[i]=id;next_hint=id+1;break;}
         }
-        C3D_ImmSendAttrib(clip[0],clip[1],clip[2],clip[3]);
-        C3D_ImmSendAttrib(rr,gg,bb,aa);
-        if(++batch_vertices>=BATCH_VERTEX_LIMIT)flush_batch();
     }
 }
+void glBindBuffer(unsigned int target,unsigned int id){if(target==GL_ARRAY_BUFFER)bound_buffer=(id<BUFFER_MAX)?id:0;}
+
+/* La GPU puede seguir leyendo un buffer durante el cuadro actual: se libera
+   al inicio del siguiente cuadro. */
+static void release_later(void *data,int linear){
+    if(!data)return;
+    if(pending_n<PENDING_MAX){pending[pending_n].data=data;pending[pending_n].linear=linear;pending_n++;}
+    else { if(linear)linearFree(data); else free(data); }
+}
+void glBufferData(unsigned int target,long size,const void *data,unsigned int usage){
+    (void)usage;
+    if(target!=GL_ARRAY_BUFFER||!bound_buffer||size<0)return;
+    Buffer *b=&buffers[bound_buffer];
+    release_later(b->data,b->linear);
+    b->data=NULL;b->size=0;b->linear=0;
+    if(!size)return;
+    b->data=linearAlloc((size_t)size);
+    if(b->data)b->linear=1; else b->data=malloc((size_t)size);
+    if(!b->data)return;
+    b->size=(size_t)size;
+    if(data)memcpy(b->data,data,(size_t)size);
+    if(b->linear)GSPGPU_FlushDataCache(b->data,(u32)size);
+}
+void glDeleteBuffers(int n,const unsigned int *ids){
+    for(int i=0;i<n;i++){
+        unsigned id=ids[i];
+        if(id==0||id>=BUFFER_MAX)continue;
+        release_later(buffers[id].data,buffers[id].linear);
+        buffers[id].data=NULL;buffers[id].size=0;buffers[id].used=0;buffers[id].linear=0;
+        if(bound_buffer==id)bound_buffer=0;
+    }
+}
+
+/* ---------- buffer temporal por cuadro (memoria lineal) ---------- */
+static void *ring_copy(const unsigned char *src,int stride,int elem,int count){
+    size_t need=(size_t)elem*(size_t)count;
+    size_t start=(ring_used+15u)&~(size_t)15u;
+    if(!ring||start+need>RING_BYTES)return NULL;
+    unsigned char *dst=ring+start;
+    if(stride==elem)memcpy(dst,src,need);
+    else for(int i=0;i<count;i++)memcpy(dst+(size_t)i*elem,src+(size_t)i*stride,(size_t)elem);
+    ring_used=start+need;
+    return dst;
+}
+
+void brick3ds_compat_init(void){
+    ring=(unsigned char*)linearAlloc(RING_BYTES);
+    identity(&projection);identity(&modelview);
+}
+void brick3ds_compat_frame_begin(void){
+    /* C3D_FRAME_SYNCDRAW ya esperó a que la GPU terminara el cuadro anterior. */
+    for(int i=0;i<pending_n;i++){if(pending[i].linear)linearFree(pending[i].data);else free(pending[i].data);}
+    pending_n=0;
+    ring_used=0;
+}
+void brick3ds_flush(void){
+    if(ring&&ring_used)GSPGPU_FlushDataCache(ring,(u32)ring_used);
+}
+void brick3ds_compat_exit(void){
+    brick3ds_compat_frame_begin();
+    for(int i=1;i<BUFFER_MAX;i++)if(buffers[i].data){if(buffers[i].linear)linearFree(buffers[i].data);else free(buffers[i].data);buffers[i].data=NULL;}
+    if(ring){linearFree(ring);ring=NULL;}
+}
+
+/* ---------- dibujo ---------- */
+void glDrawArrays(unsigned int mode,int first,int count){
+    if(mode!=GL_TRIANGLES||!vertex_enabled||!vertex_ptr||count<=0||first<0)return;
+    if(vertex_type!=GL_FLOAT)return;
+
+    int use_color=color_enabled&&color_ptr&&color_type==GL_UNSIGNED_BYTE;
+    int vs=vertex_stride?vertex_stride:vertex_size*(int)sizeof(float);
+    int cs=color_stride?color_stride:color_size;
+    int vel=vertex_size*(int)sizeof(float);
+
+    const void *vbuf,*cbuf=NULL; int draw_first;
+    int direct=vertex_lin&&(!use_color||color_lin);
+    if(direct){
+        vbuf=vertex_ptr; cbuf=use_color?color_ptr:NULL; draw_first=first;
+    } else {
+        vbuf=ring_copy(vertex_ptr+(size_t)first*vs,vs,vel,count);
+        if(use_color){cbuf=ring_copy(color_ptr+(size_t)first*cs,cs,color_size,count);vs=vel;cs=color_size;}
+        else vs=vel;
+        if(!vbuf||(use_color&&!cbuf))return;   /* buffer del cuadro lleno: se omite */
+        draw_first=0;
+    }
+
+    C3D_AttrInfo *ai=C3D_GetAttrInfo(); AttrInfo_Init(ai);
+    AttrInfo_AddLoader(ai,0,GPU_FLOAT,vertex_size);
+    C3D_BufInfo *bi=C3D_GetBufInfo(); BufInfo_Init(bi);
+    BufInfo_Add(bi,vbuf,vs,1,0x0);
+    if(use_color){
+        AttrInfo_AddLoader(ai,1,GPU_UNSIGNED_BYTE,color_size);
+        BufInfo_Add(bi,cbuf,cs,1,0x1);
+    } else {
+        AttrInfo_AddFixed(ai,1);
+        C3D_FVec *f=C3D_FixedAttribGetWritePtr(1);
+        /* el shader divide el color entre 255 */
+        f->x=current_color[0]*255.0f; f->y=current_color[1]*255.0f;
+        f->z=current_color[2]*255.0f; f->w=current_color[3]*255.0f;
+    }
+    upload_mvp();
+    C3D_DrawArrays(GPU_TRIANGLES,draw_first,count);
+}
+
 static float clear_color[4]={0,0,0,1};
 extern void brick3ds_clear(float r,float g,float b,float a,unsigned mask);
 void glClearColor(float r,float g,float b,float a){clear_color[0]=r;clear_color[1]=g;clear_color[2]=b;clear_color[3]=a;}
-void glClear(unsigned int mask){flush_batch();brick3ds_clear(clear_color[0],clear_color[1],clear_color[2],clear_color[3],mask);(void)depth_enabled;}
-
-void brick3ds_flush(void){flush_batch();}
+void glClear(unsigned int mask){brick3ds_clear(clear_color[0],clear_color[1],clear_color[2],clear_color[3],mask);}

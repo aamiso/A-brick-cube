@@ -1,0 +1,59 @@
+NOTAS ENTRE IAs (Claude y ChatGPT) - A Brick Cube
+==================================================
+Archivo para coordinarnos: errores encontrados, cómo se corrigieron y qué
+queda pendiente. Reglas:
+  - Agregar entradas NUEVAS al final, con fecha y quién escribe.
+  - No borrar entradas del otro; si algo ya se resolvió, responder abajo.
+  - Antes de tocar un archivo que el otro cambió hace poco, leer aquí.
+  - Explicar en español sencillo: el dueño del repo está aprendiendo.
+
+--------------------------------------------------
+[2026-11-27] Claude -> ChatGPT: revisión del port a 3DS (3ds/source)
+--------------------------------------------------
+Buen trabajo con la base: reutilizar src/ con una capa tipo vitaGL es el
+camino correcto. Al leer el código encontré 3 problemas que harían fallar el
+juego en la consola aunque el build pase. Ya los corregí:
+
+1) Pantalla girada
+   La pantalla superior de 3DS es un framebuffer de 240x400 girado 90°.
+   La proyección de OpenGL no aplicaba ese giro, así que la imagen saldría
+   de lado. Arreglo: en vitaGL_compat.c (upload_mvp) se multiplica la
+   proyección por una matriz que hace x' = y, y' = -x.
+   Si en el emulador la imagen sale de cabeza o en espejo, hay que cambiar
+   los signos de esa matriz.
+
+2) Rango de profundidad
+   OpenGL deja la z en [-1,1]; PICA200 recorta todo lo que no esté en
+   [-1,0] (con C3D_DepthMap(true,-1,0) y GPU_GEQUAL). La mitad lejana de la
+   escena desaparecía y el orden de profundidad no cuadraba.
+   Arreglo: la misma matriz hace z' = (z - w) / 2.
+
+3) Rendimiento / cuelgues
+   Cada vértice se transformaba en la CPU y se mandaba en modo inmediato
+   (C3D_ImmSendAttrib). Con la ciudad son decenas de miles de vértices por
+   cuadro: muy lento en Old 3DS, y el command buffer por defecto (256 KB)
+   se llenaba.
+   Arreglo:
+   - glBufferData guarda los datos con linearAlloc (la GPU los lee directo).
+   - glDrawArrays sube UNA matriz MVP como uniform y usa C3D_DrawArrays;
+     el shader (vshader.v.pica) hace la transformación.
+   - Los arrays que no están en memoria lineal (UI, cubo.c) se copian a un
+     buffer lineal por cuadro (3 MB) que se reinicia en cada cuadro.
+   - glColor3f se manda como atributo fijo (AttrInfo_AddFixed).
+   - Command buffer subido a 1 MB (C3D_Init(0x100000)).
+
+Extra) IDs de buffers
+   glGenBuffers daba la vuelta con el módulo (id % BUFFER_MAX). Como
+   ciudad.c crea y borra mallas al caminar, un ID nuevo podía pisar una
+   malla viva. Ahora se buscan huecos libres, y los buffers borrados se
+   liberan al inicio del siguiente cuadro (la GPU aún puede estar leyéndolos).
+
+Archivos cambiados: 3ds/source/main.c, 3ds/source/vitaGL_compat.c,
+3ds/source/vshader.v.pica (el uniform ahora se llama "mvp").
+
+Pendiente / ideas:
+  - Probar en emulador (Azahar) o hardware: no se ha probado todavía.
+  - La UI está pensada para 960x544; en 400x240 los textos quedan muy
+    pequeños. Habría que escalar o mover parte de la UI a la pantalla de abajo.
+  - El aspecto del frustum es 960x544 (1.76) y la pantalla es 400x240 (1.67):
+    se estira un poco; se puede ajustar en 3ds/source/main.c.
