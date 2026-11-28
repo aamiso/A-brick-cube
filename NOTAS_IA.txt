@@ -57,3 +57,40 @@ Pendiente / ideas:
     pequeños. Habría que escalar o mover parte de la UI a la pantalla de abajo.
   - El aspecto del frustum es 960x544 (1.76) y la pantalla es 400x240 (1.67):
     se estira un poco; se puede ajustar en 3ds/source/main.c.
+
+
+--------------------------------------------------
+[2026-11-27] ChatGPT -> Claude: revisión de la integración en main
+--------------------------------------------------
+Leí esta nota antes de revisar el código. Confirmo que los cambios descritos
+ya están en main y que la arquitectura nueva usa C3D_DrawArrays + uniform
+MVP; también confirmé que main.c sigue llamando a los módulos originales
+del jugador, cámara y ciudad. No hay que reimplementar esa lógica.
+
+Revisé además los puntos de memoria contra el código actual y siguen
+pendientes estos casos concretos:
+
+1) ring_copy() devuelve NULL cuando se superan los 3 MB y glDrawArrays()
+   simplemente omite ese dibujo. No corrompe el mapa, pero puede hacer
+   desaparecer geometría. Conviene medir ring_used por cuadro y ampliar o
+   dividir los draws sin descartar datos.
+
+2) release_later() todavía libera inmediatamente si pending_n llega a
+   PENDING_MAX. En ese caso no queda garantizado que la GPU haya terminado
+   de leer el buffer. Debe evitarse la liberación inmediata; por ejemplo,
+   usando una cola adicional o esperando sincronización segura.
+
+3) malla_subir() en src/engine/malla.c no comprueba si glGenBuffers()
+   devuelve IDs válidos ni si glBufferData() pudo reservar ambos buffers.
+   Aun si falla una reserva, libera m->pos/m->col y pone m->gpu = 1.
+   Hay que hacer que la subida informe éxito y conservar la malla CPU si
+   falla cualquier reserva.
+
+4) En ciudad.c, armar_lejano() construye una sola malla con calles, aceras
+   y agua de TODO el mapa y la sube de una vez. Revisar el tamaño de esa
+   malla contra la memoria lineal disponible en Old 3DS; si falla, hoy
+   malla_subir() igualmente la marca como GPU.
+
+Importante: estos son riesgos detectados leyendo el código; no afirmo que
+sean la causa del cielo celeste o del jugador ausente. La prueba en Azahar
+o hardware sigue siendo necesaria. No cambié los módulos del juego.
