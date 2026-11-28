@@ -25,6 +25,9 @@ static int vertex_size=3, color_size=4, vertex_stride=0, color_stride=0;
 static unsigned vertex_type=GL_FLOAT, color_type=GL_UNSIGNED_BYTE;
 static int vertex_enabled=0, color_enabled=0, depth_enabled=1;
 static float current_color[4]={1,1,1,1};
+static int batch_active=0, batch_vertices=0;
+#define BATCH_VERTEX_LIMIT 4096
+static void flush_batch(void){if(batch_active){C3D_ImmDrawEnd();batch_active=0;batch_vertices=0;}}
 
 static void identity(Mat4 *m){memset(m,0,sizeof(*m));m->m[0]=m->m[5]=m->m[10]=m->m[15]=1.0f;}
 static void multiply(Mat4 *out,const Mat4 *a,const Mat4 *b){
@@ -77,8 +80,8 @@ void glOrtho(double l,double r,double b,double t,double n,double f){
     m.m[12]=(float)(-(r+l)/(r-l));m.m[13]=(float)(-(t+b)/(t-b));m.m[14]=(float)(-(f+n)/(f-n));multiply_current(&m);
 }
 void glViewport(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
-void glEnable(unsigned int cap){if(cap==GL_DEPTH_TEST){depth_enabled=1;C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);}}
-void glDisable(unsigned int cap){if(cap==GL_DEPTH_TEST){depth_enabled=0;C3D_DepthTest(false,GPU_ALWAYS,GPU_WRITE_ALL);}}
+void glEnable(unsigned int cap){if(cap==GL_DEPTH_TEST){flush_batch();depth_enabled=1;C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);}}
+void glDisable(unsigned int cap){if(cap==GL_DEPTH_TEST){flush_batch();depth_enabled=0;C3D_DepthTest(false,GPU_ALWAYS,GPU_WRITE_ALL);}}
 void glEnableClientState(unsigned int cap){if(cap==GL_VERTEX_ARRAY)vertex_enabled=1;if(cap==GL_COLOR_ARRAY)color_enabled=1;}
 void glDisableClientState(unsigned int cap){if(cap==GL_VERTEX_ARRAY)vertex_enabled=0;if(cap==GL_COLOR_ARRAY)color_enabled=0;}
 void glVertexPointer(int size,unsigned int type,int stride,const void *ptr){vertex_size=size;vertex_type=type;vertex_stride=stride;vertex_ptr=(const float*)resolve_pointer(ptr);}
@@ -93,12 +96,11 @@ void glBufferData(unsigned int target,long size,const void *data,unsigned int us
 void glDeleteBuffers(int n,const unsigned int *ids){for(int i=0;i<n;i++){unsigned id=ids[i];if(id<BUFFER_MAX){free(buffers[id].data);buffers[id].data=NULL;buffers[id].size=0;}if(bound_buffer==id)bound_buffer=0;}}
 void glDrawArrays(unsigned int mode,int first,int count){
     if(mode!=GL_TRIANGLES||!vertex_enabled||!vertex_ptr||count<=0)return;
-    Mat4 mv, mvp;mv=modelview;multiply(&mvp,&projection,&mv);
-    brick3ds_set_identity_uniforms();
-    C3D_ImmDrawBegin(GPU_TRIANGLES);
+    Mat4 mv,mvp;mv=modelview;multiply(&mvp,&projection,&mv);
     int vs=vertex_stride?vertex_stride:vertex_size*(int)sizeof(float);
     int cs=color_stride?color_stride:(color_type==GL_UNSIGNED_BYTE?color_size:(int)(color_size*sizeof(float)));
     for(int i=0;i<count;i++){
+        if(!batch_active){brick3ds_set_identity_uniforms();C3D_ImmDrawBegin(GPU_TRIANGLES);batch_active=1;batch_vertices=0;}
         const unsigned char *vp=(const unsigned char*)vertex_ptr+(size_t)(first+i)*vs;
         float x=((const float*)vp)[0],y=((const float*)vp)[1],z=vertex_size>2?((const float*)vp)[2]:0.0f;
         float eye[4],clip[4];apply(&mv,x,y,z,1,eye);apply(&projection,eye[0],eye[1],eye[2],eye[3],clip);
@@ -110,10 +112,12 @@ void glDrawArrays(unsigned int mode,int first,int count){
         }
         C3D_ImmSendAttrib(clip[0],clip[1],clip[2],clip[3]);
         C3D_ImmSendAttrib(rr,gg,bb,aa);
+        if(++batch_vertices>=BATCH_VERTEX_LIMIT)flush_batch();
     }
-    C3D_ImmDrawEnd();
 }
 static float clear_color[4]={0,0,0,1};
 extern void brick3ds_clear(float r,float g,float b,float a,unsigned mask);
 void glClearColor(float r,float g,float b,float a){clear_color[0]=r;clear_color[1]=g;clear_color[2]=b;clear_color[3]=a;}
-void glClear(unsigned int mask){brick3ds_clear(clear_color[0],clear_color[1],clear_color[2],clear_color[3],mask);(void)depth_enabled;}
+void glClear(unsigned int mask){flush_batch();brick3ds_clear(clear_color[0],clear_color[1],clear_color[2],clear_color[3],mask);(void)depth_enabled;}
+
+void brick3ds_flush(void){flush_batch();}
