@@ -5,6 +5,10 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef __3DS__
+extern int brick3ds_buffer_valid(unsigned int id, size_t minimum_size);
+#endif
+
 void malla_iniciar(Malla *m) { m->pos = NULL; m->col = NULL; m->n = m->cap = 0; m->gpu = 0; m->vbo[0] = m->vbo[1] = 0; }
 
 void malla_liberar(Malla *m) {
@@ -81,12 +85,31 @@ void malla_caja(Malla *m, float x, float y, float z, float sx, float sy, float s
 
 void malla_subir(Malla *m) {
     if (m->gpu || m->n <= 0) return;
+    size_t bytes_pos = (size_t)m->n * 3u * sizeof(float);
+    size_t bytes_col = (size_t)m->n * 4u;
     glGenBuffers(2, m->vbo);
+
+    if (!m->vbo[0] || !m->vbo[1]) {
+        glDeleteBuffers(2, m->vbo);
+        m->vbo[0] = m->vbo[1] = 0;
+        return; /* Conserva la copia CPU: se puede dibujar sin VBO. */
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, m->vbo[0]);
-    glBufferData(GL_ARRAY_BUFFER, (long)m->n * 3 * (long)sizeof(float), m->pos, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (long)bytes_pos, m->pos, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, m->vbo[1]);
-    glBufferData(GL_ARRAY_BUFFER, (long)m->n * 4, m->col, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (long)bytes_col, m->col, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+#ifdef __3DS__
+    if (!brick3ds_buffer_valid(m->vbo[0], bytes_pos) ||
+        !brick3ds_buffer_valid(m->vbo[1], bytes_col)) {
+        glDeleteBuffers(2, m->vbo);
+        m->vbo[0] = m->vbo[1] = 0;
+        return; /* No marcar GPU ni borrar datos si falló una reserva. */
+    }
+#endif
+
     free(m->pos); free(m->col);
     m->pos = NULL; m->col = NULL; m->cap = 0;
     m->gpu = 1;
