@@ -28,6 +28,23 @@ static int brick_u_mvp;
 extern void brick3ds_compat_init(void);
 extern void brick3ds_compat_frame_begin(void);
 extern void brick3ds_compat_exit(void);
+/* Lee el Circle Pad con zona muerta radial. El Circle Pad entrega aprox.
+   -156..156; normalizamos el vector completo para evitar diagonales desiguales
+   y quitamos la zona muerta una sola vez (sin el segundo filtro de leer_stick). */
+static void brick3ds_read_circle(const circlePosition *cp, float *x, float *y) {
+    const float max_axis = 156.0f;
+    const float dead_zone = 18.0f;
+    float dx = (float)cp->dx;
+    float dy = (float)cp->dy;
+    float mag = sqrtf(dx * dx + dy * dy);
+    if (mag <= dead_zone) { *x = 0.0f; *y = 0.0f; return; }
+    float limited = mag > max_axis ? max_axis : mag;
+    float strength = (limited - dead_zone) / (max_axis - dead_zone);
+    if (strength > 1.0f) strength = 1.0f;
+    *x = (dx / mag) * strength;
+    *y = -(dy / mag) * strength; /* arriba = valor negativo, igual que leer_stick() */
+}
+
 static const u32 brick_transfer_flags =
  GX_TRANSFER_FLIP_VERT(0)|GX_TRANSFER_OUT_TILED(0)|GX_TRANSFER_RAW_COPY(0)|
  GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8)|GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8)|
@@ -158,8 +175,8 @@ int main(void) {
         if(held&KEY_Y)pad.buttons|=SCE_CTRL_SQUARE;
         if(held&KEY_R)pad.buttons|=SCE_CTRL_RTRIGGER;
         if(held&KEY_L)pad.buttons|=SCE_CTRL_LTRIGGER;
-        pad.lx=(unsigned char)(128+(int)cp.dx*127/156);
-        pad.ly=(unsigned char)(128-(int)cp.dy*127/156);
+        float lx = 0.0f, ly = 0.0f;
+        brick3ds_read_circle(&cp, &lx, &ly);
         float rx=((held&KEY_DRIGHT)?1.0f:0.0f)-((held&KEY_DLEFT)?1.0f:0.0f);
         float ry=((held&KEY_DUP)?1.0f:0.0f)-((held&KEY_DDOWN)?1.0f:0.0f);
         brick3ds_frame_begin();
@@ -167,7 +184,6 @@ int main(void) {
         // --- Actualizar ---
         unsigned nuevos = pad.buttons & ~prev;
         prev = pad.buttons;
-        float lx = leer_stick(pad.lx), ly = leer_stick(pad.ly);
         /* Cruceta: control de cámara en Old 3DS, sin stick derecho. */
         // --- Transición (fundido a negro) ---
         if (fase_f == 1) {
