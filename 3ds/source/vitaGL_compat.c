@@ -26,7 +26,7 @@ static unsigned vertex_type=GL_FLOAT, color_type=GL_UNSIGNED_BYTE;
 static int vertex_enabled=0, color_enabled=0, depth_enabled=1;
 static float current_color[4]={1,1,1,1};
 static int batch_active=0, batch_vertices=0;
-#define BATCH_VERTEX_LIMIT 4096
+#define BATCH_VERTEX_LIMIT 4095 /* múltiplo de 3: nunca corta un triángulo */
 static void flush_batch(void){if(batch_active){C3D_ImmDrawEnd();batch_active=0;batch_vertices=0;}}
 
 static void identity(Mat4 *m){memset(m,0,sizeof(*m));m->m[0]=m->m[5]=m->m[10]=m->m[15]=1.0f;}
