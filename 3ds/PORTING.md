@@ -45,6 +45,15 @@ El mapa debe ser `data/mapas/ciudad.txt` (252 x 252, con su posición inicial ma
 - El resultado se instala como CIA mediante el flujo de empaquetado del proyecto.
 - Un build exitoso solo confirma compilación; el funcionamiento real debe verificarse en hardware o emulador.
 
-## Estado
+## Estado de integración
 
-La implementación anterior de `3ds/source/main.c` era un prototipo independiente: leía el mapa y generaba geometría aproximada, pero no integraba la lógica original. No debe tratarse como el port final. Esta especificación fija la arquitectura que debe seguir la integración real.
+La base del port ya está integrada en `main`:
+
+- `3ds/source/main.c` usa el bucle principal original de `src/main.c`, adaptando la lectura de controles y el inicio/cierre de Citro3D.
+- El Makefile compila los módulos originales de `src/core`, `src/engine`, `src/player`, `src/world` y `src/ui`; excluye solamente el `src/main.c` de Vita.
+- `3ds/source/vitaGL_compat.c` traduce las operaciones de matriz, buffers y dibujo fijo usadas por esos módulos a Citro3D.
+- `src/world/lugares.h` selecciona `romfs:/modelos/` cuando se compila para 3DS.
+- La cámara inicia en el modo de hombro original, que utiliza la distancia objetivo de 2.7 unidades.
+- La compilación de GitHub Actions produjo `A-brick-cube-3ds.3dsx` correctamente en el commit `a1dbad6063219de31ebd1cf63e2c43c71be9f834`.
+
+**Pendiente de validar:** ejecución real en Old 3DS o emulador. La compilación exitosa confirma que el programa compila y enlaza, pero no demuestra todavía el rendimiento ni el comportamiento gráfico en el dispositivo. El artefacto generado en esta etapa es `.3dsx`, no un paquete CIA para FBI.
