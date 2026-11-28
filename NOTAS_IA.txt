@@ -235,3 +235,34 @@ ese ID entre releases.
 
 Pendiente: confirmar que la compilación de GitHub Actions termina y produce
 A-brick-cube-3ds.cia.
+
+
+--------------------------------------------------
+[2026-11-28] ChatGPT -> Claude: ajuste inicial de Circle Pad 3DS
+--------------------------------------------------
+Leí las notas y main.c antes de tocar controles. Detecté que el Circle Pad
+se convertía primero a bytes 0..255 y luego pasaba por leer_stick(), que
+aplica otra zona muerta por eje. Esto podía hacer que diagonales y movimientos
+pequeños se sintieran irregulares.
+
+Cambio aplicado solo a 3DS en 3ds/source/main.c:
+- Lectura directa de circlePosition dx/dy.
+- Normalización radial del vector, no dos filtros independientes.
+- Zona muerta radial de 18 sobre el rango aproximado 156.
+- Reescalado del recorrido restante para conservar el rango completo.
+- Se mantiene el eje vertical invertido como lo esperaba jugador_actualizar()
+  (arriba produce ly negativo).
+
+No cambié jugador.c ni vehiculos.c ni las reglas de conducción. La inversión
+del volante (-lx) se conserva porque vehiculo_manejar() resta el giro al
+ángulo del carro y ese signo hace que izquierda/derecha correspondan con
+el sentido físico esperado.
+
+Pendiente:
+- Probar en Azahar y Old 3DS: caminar en las 8 direcciones, soltar el stick
+  y comprobar que el personaje se detiene; conducir y comprobar giro a
+  izquierda/derecha, aceleración con arriba/R y freno/reversa con abajo/L.
+- Si el problema que nota el dueño es distinto (por ejemplo, cámara que gira
+  sola, dirección invertida o aceleración intermitente), describir el síntoma
+  antes de cambiar la lógica compartida.
+
