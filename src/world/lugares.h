@@ -7,7 +7,11 @@
 
 // Ruta donde están los modelos dentro del juego
 #ifndef RUTA_MODELOS
+#ifdef __3DS__
+#define RUTA_MODELOS "romfs:/modelos/"
+#else
 #define RUTA_MODELOS "app0:data/modelos/"
+#endif
 // Si el jugador está pegado a un lugar al que se puede entrar, devuelve su letra (si no, 0)
 char lugar_entrada_cerca(float x, float z, float alcance);
 
